@@ -33,6 +33,10 @@ fn get_oprand_bytecode(bytecodes: &Vec<Bytecode>, code_offset: usize, src_idx: u
     while tmp_index!=0 {
         match &bytecodes[tmp_index] {
             Bytecode::Call(_, dst, _, _, _) => {
+                if dst.is_empty() {
+                    tmp_index = tmp_index - 1;
+                    continue;
+                }
                 if dst[0] == src_idx  {
                     return &bytecodes[tmp_index];
                 } else {
