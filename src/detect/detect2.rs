@@ -74,32 +74,32 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                                 }
                             },
                             Bytecode::Call(_, _, Operation::CastU8, src, _) => {
-                                if 8 <= get_ubits(src[0], local_types) + (shl_bit as u16) {
+                                if 8 < get_ubits(src[0], local_types) + (shl_bit as u16) {
                                     return true;
                                 }
                             },
                             Bytecode::Call(_, _, Operation::CastU16, src, _) => {
-                                if 16 <= get_ubits(src[0], local_types) + (shl_bit as u16) {
+                                if 16 < get_ubits(src[0], local_types) + (shl_bit as u16) {
                                     return true;
                                 }
                             },
                             Bytecode::Call(_, _, Operation::CastU32, src, _) => {
-                                if 32 <= get_ubits(src[0], local_types) + (shl_bit as u16) {
+                                if 32 < get_ubits(src[0], local_types) + (shl_bit as u16) {
                                     return true;
                                 }
                             },
                             Bytecode::Call(_, _, Operation::CastU64, src, _) => {
-                                if 64 <= get_ubits(src[0], local_types) + (shl_bit as u16) {
+                                if 64 < get_ubits(src[0], local_types) + (shl_bit as u16) {
                                     return true;
                                 }
                             },
                             Bytecode::Call(_, _, Operation::CastU128, src, _) => {
-                                if 128 <= get_ubits(src[0], local_types) + (shl_bit as u16) {
+                                if 128 < get_ubits(src[0], local_types) + (shl_bit as u16) {
                                     return true;
                                 }
                             }, 
                             Bytecode::Call(_, _, Operation::CastU256, src, _) => {
-                                if 256 <= get_ubits(src[0], local_types) + (shl_bit as u16) {
+                                if 256 < get_ubits(src[0], local_types) + (shl_bit as u16) {
                                     return true;
                                 }
                             },
@@ -132,7 +132,7 @@ fn get_oprand_bytecode(bytecodes: &Vec<Bytecode>, code_offset: usize, src_idx: u
                     continue;
                 }
             },
-            Bytecode::Assign(_, dst, src, _) => {
+            Bytecode::Assign(_, dst, _, _) => {
                 if *dst == src_idx {
                     return &bytecodes[tmp_index];
                 } else {
