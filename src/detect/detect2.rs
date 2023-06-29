@@ -13,11 +13,15 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
     for (code_offset, bytecode) in function.code.iter().enumerate() {
         match &bytecode {
             Bytecode::Call(_, _ , Operation::Shl, srcs, _) => {
-                let oprand1 = get_oprand_bytecode(&function.code, code_offset-1, srcs[0]);
-                let oprand2 = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                let mut oprand1 = get_oprand_bytecode(&function.code, code_offset-1, srcs[0]);
+                let mut oprand2 = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                // 先判断oprand2的情况(是否是常量，是否有类型转换，是否有mod)
                 if is_ldconst(oprand2) {
+                    // 如果oprand2是常量，意味着移位的位数是固定的
                     let shl_bit = get_const_u8(oprand2).unwrap();
+                    // 再判断oprand1的情况，是否是常量，是否存在类型转换，是否存在mod
                     if is_ldconst(oprand1) {
+                        // oprand1也是常量，那么可以直接算出是否会溢出
                         match oprand1 {
                             Bytecode::Load(_, _, Constant::U8(c)) => {
                                 let num = *c;
@@ -59,13 +63,15 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                             }
                         }
                     } else if is_assign(oprand1) {
+                        // 如果oprand1是变量，那么认为会溢出
                         return true;
                     } else if is_call(oprand1) {
                         match &oprand1 {
+                            // oprand1有mod操作
                             Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
                                 let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
                                 if is_ldconst(mod_num) {
-                                    let modnum = get_const(mod_num).unwrap();
+                                    let modnum = get_const(mod_num).unwrap()-1;
                                     if modnum.leading_zeros() < (shl_bit as u32) {
                                         return true;
                                     }
@@ -73,39 +79,336 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                                     return true;
                                 }
                             },
+                            // oprand1有类型转换，src[0]就是原始数据的类型(也就是转换前变量的类型，可以反应转换前变量的范围)
                             Bytecode::Call(_, _, Operation::CastU8, src, _) => {
+                                // 这里可能在类型转换之前有mod操作,判断一下
+                                let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                match &tmp_oprand {
+                                    Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
+                                        let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                        if is_ldconst(mod_num) {
+                                            let modnum = get_const(mod_num).unwrap()-1;
+                                            if modnum.leading_zeros() < (shl_bit as u32) {
+                                                return true;
+                                            }
+                                        }
+                                    },
+                                    _ => {
+                                    }
+                                }
                                 if 8 < get_ubits(src[0], local_types) + (shl_bit as u16) {
                                     return true;
                                 }
                             },
                             Bytecode::Call(_, _, Operation::CastU16, src, _) => {
+                                // 这里可能在类型转换之前有mod操作,判断一下
+                                let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                match &tmp_oprand {
+                                    Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
+                                        let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                        if is_ldconst(mod_num) {
+                                            let modnum = get_const(mod_num).unwrap()-1;
+                                            if modnum.leading_zeros() < (shl_bit as u32) {
+                                                return true;
+                                            }
+                                        }
+                                    },
+                                    _ => {
+                                    }
+                                }
                                 if 16 < get_ubits(src[0], local_types) + (shl_bit as u16) {
                                     return true;
                                 }
                             },
                             Bytecode::Call(_, _, Operation::CastU32, src, _) => {
+                                // 这里可能在类型转换之前有mod操作,判断一下
+                                let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                match &tmp_oprand {
+                                    Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
+                                        let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                        if is_ldconst(mod_num) {
+                                            let modnum = get_const(mod_num).unwrap()-1;
+                                            if modnum.leading_zeros() < (shl_bit as u32) {
+                                                return true;
+                                            }
+                                        }
+                                    },
+                                    _ => {
+                                    }
+                                }
                                 if 32 < get_ubits(src[0], local_types) + (shl_bit as u16) {
                                     return true;
                                 }
                             },
                             Bytecode::Call(_, _, Operation::CastU64, src, _) => {
+                                // 这里可能在类型转换之前有mod操作,判断一下
+                                let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                match &tmp_oprand {
+                                    Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
+                                        let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                        if is_ldconst(mod_num) {
+                                            let modnum = get_const(mod_num).unwrap()-1;
+                                            if modnum.leading_zeros() < (shl_bit as u32) {
+                                                return true;
+                                            }
+                                        }
+                                    },
+                                    _ => {
+                                    }
+                                }
                                 if 64 < get_ubits(src[0], local_types) + (shl_bit as u16) {
                                     return true;
                                 }
                             },
                             Bytecode::Call(_, _, Operation::CastU128, src, _) => {
+                                // 这里可能在类型转换之前有mod操作,判断一下
+                                let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                match &tmp_oprand {
+                                    Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
+                                        let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                        if is_ldconst(mod_num) {
+                                            let modnum = get_const(mod_num).unwrap()-1;
+                                            if modnum.leading_zeros() < (shl_bit as u32) {
+                                                return true;
+                                            }
+                                        }
+                                    },
+                                    _ => {
+                                    }
+                                }
                                 if 128 < get_ubits(src[0], local_types) + (shl_bit as u16) {
                                     return true;
                                 }
                             }, 
                             Bytecode::Call(_, _, Operation::CastU256, src, _) => {
+                                // 这里可能在类型转换之前有mod操作,判断一下
+                                let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                match &tmp_oprand {
+                                    Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
+                                        let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                        if is_ldconst(mod_num) {
+                                            let modnum = get_const(mod_num).unwrap()-1;
+                                            if modnum.leading_zeros() < (shl_bit as u32) {
+                                                return true;
+                                            }
+                                        }
+                                    },
+                                    _ => {
+                                    }
+                                }
                                 if 256 < get_ubits(src[0], local_types) + (shl_bit as u16) {
                                     return true;
                                 }
                             },
                             _ => {
-                                continue;
                             }
+                        }
+                    }
+                } else if is_call(oprand2) {
+                    // oprand2不是常量，这里可能有类型转换，或者mod
+                    match &oprand2 {
+                        // 先排除一个类型转换
+                        Bytecode::Call(_, _, Operation::CastU8, src, _) => {
+                            oprand2 = get_oprand_bytecode(&function.code, code_offset, src[0]);
+                        },
+                        _ => {
+                        }
+                    }
+                    // 类型转换完后可能存在mod
+                    match &oprand2 {
+                        Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
+                            let op2_mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                            if is_ldconst(op2_mod_num) {
+                                let op2modnum = get_const_u64(op2_mod_num).unwrap()-1;
+                                if is_ldconst(oprand1) {
+                                    // oprand1是常量
+                                    match oprand1 {
+                                        Bytecode::Load(_, _, Constant::U8(c)) => {
+                                            let num = *c;
+                                            if num.leading_zeros() < (op2modnum as u32) {
+                                                return true;
+                                            }
+                                        },
+                                        Bytecode::Load(_, _, Constant::U16(c)) => {
+                                            let num = *c;
+                                            if num.leading_zeros() < (op2modnum as u32) {
+                                                return true;
+                                            }
+                                        },
+                                        Bytecode::Load(_, _, Constant::U32(c)) => {
+                                            let num = *c;
+                                            if num.leading_zeros() < (op2modnum as u32) {
+                                                return true;
+                                            }
+                                        },
+                                        Bytecode::Load(_, _, Constant::U64(c)) => {
+                                            let num = *c;
+                                            if num.leading_zeros() < (op2modnum as u32) {
+                                                return true;
+                                            }
+                                        },
+                                        Bytecode::Load(_, _, Constant::U128(c)) => {
+                                            let num = *c;
+                                            if num.leading_zeros() < (op2modnum as u32) {
+                                                return true;
+                                            }
+                                        },
+                                        Bytecode::Load(_, _, Constant::U256(c)) => {
+                                            let num = *c;
+                                            if num.leading_zeros() < (op2modnum as u32) {
+                                                return true;
+                                            }
+                                        },
+                                        _ => {
+                                        }
+                                    }
+                                } else if is_assign(oprand1) {
+                                    // 如果oprand1是变量，那么认为会溢出
+                                    return true;
+                                } else if is_call(oprand1) {
+                                    match &oprand1 {
+                                        // oprand1有mod操作
+                                        Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
+                                            let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                            if is_ldconst(mod_num) {
+                                                let modnum = get_const(mod_num).unwrap()-1;
+                                                if modnum.leading_zeros() < (op2modnum as u32) {
+                                                    return true;
+                                                }
+                                            } else {
+                                                return true;
+                                            }
+                                        },
+                                        // oprand1有类型转换，src[0]就是原始数据的类型(也就是转换前变量的类型，可以反应转换前变量的范围)
+                                        Bytecode::Call(_, _, Operation::CastU8, src, _) => {
+                                            // 这里可能在类型转换之前有mod操作,判断一下
+                                            let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                            match &tmp_oprand {
+                                                Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
+                                                    let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                                    if is_ldconst(mod_num) {
+                                                        let modnum = get_const(mod_num).unwrap()-1;
+                                                        if modnum.leading_zeros() < (op2modnum as u32) {
+                                                            return true;
+                                                        }
+                                                    }
+                                                },
+                                                _ => {
+                                                }
+                                            }
+                                            if 8 < get_ubits(src[0], local_types) + (op2modnum as u16) {
+                                                return true;
+                                            }
+                                        },
+                                        Bytecode::Call(_, _, Operation::CastU16, src, _) => {
+                                            // 这里可能在类型转换之前有mod操作,判断一下
+                                            let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                            match &tmp_oprand {
+                                                Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
+                                                    let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                                    if is_ldconst(mod_num) {
+                                                        let modnum = get_const(mod_num).unwrap()-1;
+                                                        if modnum.leading_zeros() < (op2modnum as u32) {
+                                                            return true;
+                                                        }
+                                                    }
+                                                },
+                                                _ => {
+                                                }
+                                            }
+                                            if 16 < get_ubits(src[0], local_types) + (op2modnum as u16) {
+                                                return true;
+                                            }
+                                        },
+                                        Bytecode::Call(_, _, Operation::CastU32, src, _) => {
+                                            // 这里可能在类型转换之前有mod操作,判断一下
+                                            let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                            match &tmp_oprand {
+                                                Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
+                                                    let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                                    if is_ldconst(mod_num) {
+                                                        let modnum = get_const(mod_num).unwrap()-1;
+                                                        if modnum.leading_zeros() < (op2modnum as u32) {
+                                                            return true;
+                                                        }
+                                                    }
+                                                },
+                                                _ => {
+                                                }
+                                            }
+                                            if 32 < get_ubits(src[0], local_types) + (op2modnum as u16) {
+                                                return true;
+                                            }
+                                        },
+                                        Bytecode::Call(_, _, Operation::CastU64, src, _) => {
+                                            // 这里可能在类型转换之前有mod操作,判断一下
+                                            let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                            match &tmp_oprand {
+                                                Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
+                                                    let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                                    if is_ldconst(mod_num) {
+                                                        let modnum = get_const(mod_num).unwrap()-1;
+                                                        if modnum.leading_zeros() < (op2modnum as u32) {
+                                                            return true;
+                                                        }
+                                                    }
+                                                },
+                                                _ => {
+                                                }
+                                            }
+                                            if 64 < get_ubits(src[0], local_types) + (op2modnum as u16) {
+                                                return true;
+                                            }
+                                        },
+                                        Bytecode::Call(_, _, Operation::CastU128, src, _) => {
+                                            // 这里可能在类型转换之前有mod操作,判断一下
+                                            let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                            match &tmp_oprand {
+                                                Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
+                                                    let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                                    if is_ldconst(mod_num) {
+                                                        let modnum = get_const(mod_num).unwrap()-1;
+                                                        if modnum.leading_zeros() < (op2modnum as u32) {
+                                                            return true;
+                                                        }
+                                                    }
+                                                },
+                                                _ => {
+                                                }
+                                            }
+                                            if 128 < get_ubits(src[0], local_types) + (op2modnum as u16) {
+                                                return true;
+                                            }
+                                        }, 
+                                        Bytecode::Call(_, _, Operation::CastU256, src, _) => {
+                                            // 这里可能在类型转换之前有mod操作,判断一下
+                                            let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                            match &tmp_oprand {
+                                                Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
+                                                    let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                                    if is_ldconst(mod_num) {
+                                                        let modnum = get_const(mod_num).unwrap()-1;
+                                                        if modnum.leading_zeros() < (op2modnum as u32) {
+                                                            return true;
+                                                        }
+                                                    }
+                                                },
+                                                _ => {
+                                                }
+                                            }
+                                            if 256 < get_ubits(src[0], local_types) + (op2modnum as u16) {
+                                                return true;
+                                            }
+                                        },
+                                        _ => {
+                                        }
+                                    }
+                                }
+                            } else {
+                                return true;
+                            }
+                        },
+                        _ => {
                         }
                     }
                 } else {
