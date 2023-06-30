@@ -60,6 +60,7 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                                 }
                             },
                             _ => {
+                                return true;
                             }
                         }
                     } else if is_assign(oprand1) {
@@ -201,6 +202,7 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                                 }
                             },
                             _ => {
+                                return true;
                             }
                         }
                     }
@@ -260,6 +262,7 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                                             }
                                         },
                                         _ => {
+                                            return true;
                                         }
                                     }
                                 } else if is_assign(oprand1) {
@@ -401,6 +404,7 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                                             }
                                         },
                                         _ => {
+                                            return true;
                                         }
                                     }
                                 }
@@ -409,6 +413,7 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                             }
                         },
                         _ => {
+                            return true;
                         }
                     }
                 } else {
