@@ -22,7 +22,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             let func_id = FunId::new(symbol);
             let module_id = ModuleId::new(func.module.into_index());
             let qid = QualifiedId { 
-                module_id: self.module_data.id, 
+                module_id, 
                 id: func_id,
             };
             let node_idx = graph.add_node(qid);
@@ -66,10 +66,10 @@ fn get_unused_functions<'a>(stbgr: &'a StacklessBytecodeGenerator) -> Vec<&'a Qu
     let mut unused_functions: Vec<&QualifiedId<FunId>> = vec![];
     for (fid, nid) in stbgr.func_to_node.iter() {
         // 调用边，即入边
-        if stbgr.module_data.function_data.get(&fid.id).is_none() {
-            // 理论上没有必要的操作，但是有脏东西，如aborted
-            continue;
-        }
+        // if stbgr.module_data.function_data.get(&fid.id).is_none() {
+        //     // 理论上没有必要的操作，但是有脏东西，如aborted
+        //     continue;
+        // }
         let neighbors = stbgr.call_graph.neighbors_directed(*nid, Direction::Incoming);
         if neighbors.into_iter().next().is_none() {
             unused_functions.push(fid);
