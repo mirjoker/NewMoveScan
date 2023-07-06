@@ -49,6 +49,8 @@ pub struct FunctionInfo {
     pub loop_invariants: BTreeSet<AttrId>,
     pub fallthrough_labels: BTreeSet<Label>,
     pub cfg: Option<StacklessControlFlowGraph>,
+    pub def_attrid: Vec<Vec<AttrId>>,
+    pub use_attrid: Vec<Vec<AttrId>>,
 }
 
 impl FunctionInfo {
@@ -60,6 +62,8 @@ impl FunctionInfo {
             loop_invariants: BTreeSet::new(),
             fallthrough_labels: BTreeSet::new(),
             cfg: None,
+            def_attrid: vec![],
+            use_attrid: vec![]
         }
     }
 }
@@ -242,6 +246,43 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     &mut function,
                 );
             }
+
+            let n_ty = function.local_types.len();
+            let mut def_attrid: Vec<Vec<AttrId>> = vec![vec![]; n_ty];
+            let mut use_attrid: Vec<Vec<AttrId>> = vec![vec![]; n_ty];
+            for code in &function.code {
+                match code {
+                    Bytecode::Assign(attrid, dst, src, _) => {
+                        def_attrid[*dst].push(*attrid);
+                        use_attrid[*src].push(*attrid);
+                    },
+                    Bytecode::Call(attrid, dsts, _, srcs, _) => {
+                        dsts.iter().for_each(|dst| {
+                            def_attrid[*dst].push(*attrid);
+                        });
+                        srcs.iter().for_each(|src| {
+                            use_attrid[*src].push(*attrid);
+                        });
+                    },
+                    Bytecode::Ret(attrid, srcs) => {
+                        srcs.iter().for_each(|src| {
+                            use_attrid[*src].push(*attrid);
+                        });
+                    },
+                    Bytecode::Load(attrid, dst, _) => {
+                        def_attrid[*dst].push(*attrid);
+                    },
+                    Bytecode::Branch(attrid, _, _, src) => {
+                        use_attrid[*src].push(*attrid);
+                    },
+                    Bytecode::Abort(attrid, src) => {
+                        use_attrid[*src].push(*attrid);
+                    },
+                    _ => {}
+                }
+            }
+            function.def_attrid = def_attrid;
+            function.use_attrid = use_attrid;
 
             // Eliminate fall-through for non-branching instructions
             let code = std::mem::take(&mut function.code);
