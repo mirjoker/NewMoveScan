@@ -10,7 +10,7 @@ use super::{generate_bytecode::StacklessBytecodeGenerator, bytecode_display::ope
 
 #[derive(Debug, Clone)]
 pub enum Val {
-    Oper(Operation), // 运算符
+    ByteCode(Bytecode), // 运算符
     // 无子节点
     Const(Constant), // 常量
     ParamType(Type), // 函数参数类型
@@ -54,9 +54,16 @@ impl Node {
 
     pub fn loop_condition_from_copy(&self, condtions: &mut Vec<usize>) {
         match &self.value {
-            Val::Oper(op) => {
-                for subnode in self.subnodes.iter() {
-                    subnode.loop_condition_from_copy(condtions);
+            Val::ByteCode(bc) => {
+                match bc {
+                    Call(_, _, BorrowLoc, srcs, _) => {
+                        condtions.push(srcs[0]);
+                    },
+                    _ => {
+                        for subnode in self.subnodes.iter() {
+                            subnode.loop_condition_from_copy(condtions);
+                        }
+                    }
                 }
             },
             Val::AssIgn(Bytecode::Assign(_, _, idx, assignkind)) => {
@@ -74,9 +81,11 @@ impl Node {
     pub fn is_const(&self) -> bool {
         let mut is_const = true;
         match &self.value {
-            Val::Oper(op) => {
-                for subnode in self.subnodes.iter() {
-                    is_const = is_const && subnode.is_const();
+            Val::ByteCode(bc) => {
+                if let Call(_, _, op, _, _) = bc {
+                    for subnode in self.subnodes.iter() {
+                        is_const = is_const && subnode.is_const();
+                    }
                 }
             },
             Val::Const(con) => {
@@ -94,16 +103,18 @@ impl Node {
 
     pub fn display(&self, res: &mut String, stbgr: &StacklessBytecodeGenerator) {
         match &self.value {
-            Val::Oper(op) => {
-                let str = oper_display(&op, stbgr).to_string();
-                res.push_str(str.as_str());
-                res.push_str("(");
-                for subnode in self.subnodes.iter() {
-                    subnode.display(res, stbgr);
-                    res.push_str(", ");
+            Val::ByteCode(bc) => {
+                if let Call(_, _, op, _, _) = bc {
+                    let str = oper_display(&op, stbgr).to_string();
+                    res.push_str(str.as_str());
+                    res.push_str("(");
+                    for subnode in self.subnodes.iter() {
+                        subnode.display(res, stbgr);
+                        res.push_str(", ");
+                    }
+                    res.truncate(res.len()-2);
+                    res.push_str(")");
                 }
-                res.truncate(res.len()-2);
-                res.push_str(")");
             },
             Val::Const(con) => {
                 let str = format!("{}", con).to_string();
@@ -133,6 +144,7 @@ impl Node {
 }
 
 
+#[derive(Debug, Clone)]
 pub struct DataDepent {
     pub data: BTreeMap<usize, Node>
 }
@@ -160,8 +172,7 @@ pub fn data_dependency<'a>(stbgr: &'a StacklessBytecodeGenerator, idx: usize) ->
         data_depent.insert_or_modify(i, node);
     }
 
-    for (ii, code) in function.code.iter().enumerate() {
-        // println!("{} {:?}", ii, code);
+    for code in function.code.iter() {
         match code {
             Assign(_, dst, src, kind) => {
                 let node = data_depent.get(*src);
@@ -171,52 +182,62 @@ pub fn data_dependency<'a>(stbgr: &'a StacklessBytecodeGenerator, idx: usize) ->
             Call(_, dsts, oper, srcs, _) => {
                 match oper {
                     Function(mid, fid, _) => { // 遇到函数调用终止，Vec的使用特殊处理
-                        if mid.eq(&stbgr.vec_module_id) { // Vec
-                            // length borrow_mut/borrow push_back pop_back swap empty
-                            let a = fid.symbol().display(&stbgr.symbol_pool).to_string();
-                            let fname = a.as_str();
-                            match fname {
-                                "length" | "pop_back" => {
-                                    let node = data_depent.get(srcs[0]);
-                                    let node = Node::new_with_node(Val::Oper(oper.clone()), node);
-                                    data_depent.insert_or_modify(dsts[0], node);
-                                },
-                                "borrow_mut" | "borrow" => {
-                                    let lnode = data_depent.get(srcs[0]);
-                                    let rnode = data_depent.get(srcs[1]);
-                                    let node = Node::new_with_binary_nodes(Val::Oper(oper.clone()), lnode, rnode);
-                                    data_depent.insert_or_modify(dsts[0], node);
-                                },
-                                "empty" => { // 0 -> 1
-                                    let node = Node::new(Val::Oper(oper.clone()));
-                                    data_depent.insert_or_modify(dsts[0], node);
-                                },
-                                _ => {
-                                    // swap 3 -> 0 push_back 2 -> 0 
-                                    // continue;
-                                    let node = Node::new(Val::Oper(oper.clone()));
-                                    for dst in dsts {
-                                        data_depent.insert_or_modify(*dst, node.clone());
-                                    }
-                                }
-                            }
-                        } else { // 终止
-                            let node = Node::new(Val::Oper(oper.clone()));
-                            for dst in dsts {
-                                data_depent.insert_or_modify(*dst, node.clone());
-                            }
+                        // if mid.eq(&stbgr.vec_module_id) { // Vec
+                        //     // length borrow_mut/borrow push_back pop_back swap empty
+                        //     let a = fid.symbol().display(&stbgr.symbol_pool).to_string();
+                        //     let fname = a.as_str();
+                        //     match fname {
+                        //         "length" | "pop_back" => {
+                        //             let node = data_depent.get(srcs[0]);
+                        //             let node = Node::new_with_node(Val::Oper(oper.clone()), node);
+                        //             data_depent.insert_or_modify(dsts[0], node);
+                        //         },
+                        //         "borrow_mut" | "borrow" => {
+                        //             let lnode = data_depent.get(srcs[0]);
+                        //             let rnode = data_depent.get(srcs[1]);
+                        //             let node = Node::new_with_binary_nodes(Val::Oper(oper.clone()), lnode, rnode);
+                        //             data_depent.insert_or_modify(dsts[0], node);
+                        //         },
+                        //         "empty" => { // 0 -> 1
+                        //             let node = Node::new(Val::Oper(oper.clone()));
+                        //             data_depent.insert_or_modify(dsts[0], node);
+                        //         },
+                        //         _ => {
+                        //             // swap 3 -> 0 push_back 2 -> 0 
+                        //             // continue;
+                        //             // let node = Node::new(Val::Oper(oper.clone()));
+                        //             let mut nodes = vec![];
+                        //             for src in srcs {
+                        //                 let node = data_depent.get(*src);
+                        //                 nodes.push(node);
+                        //             }
+                        //             let node = Node::newy_with_nodes(Val::Oper(oper.clone()), nodes);
+                        //             for dst in dsts {
+                        //                 data_depent.insert_or_modify(*dst, node.clone());
+                        //             }
+                        //         }
+                        //     }
+
+                        let mut nodes = vec![];
+                        for src in srcs {
+                            let node = data_depent.get(*src);
+                            nodes.push(node);
+                        }
+                        let node = Node::newy_with_nodes(Val::ByteCode(code.clone()), nodes);
+                        for dst in dsts {
+                            data_depent.insert_or_modify(*dst, node.clone());
                         }
                     },
                     Add | Sub | Mul | Div | Mod | BitOr | BitAnd | Xor | Shl | // 二元操作
                         Shr | Lt | Gt | Le | Ge | Or | And | Eq | Neq => {
                         let lnode = data_depent.get(srcs[0]);
                         let rnode = data_depent.get(srcs[1]);
-                        let node = Node::new_with_binary_nodes(Val::Oper(oper.clone()), lnode, rnode);
+                        let node = Node::new_with_binary_nodes(Val::ByteCode(code.clone()), lnode, rnode);
                         data_depent.insert_or_modify(dsts[0], node);
                     },
                     CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | Not => { // 一元操作
                         let node = data_depent.get(srcs[0]);
-                        let node = Node::new_with_node(Val::Oper(oper.clone()), node);
+                        let node = Node::new_with_node(Val::ByteCode(code.clone()), node);
                         data_depent.insert_or_modify(dsts[0], node);
                     },
                     Pack(_, _, _) => { // n -> 1
@@ -225,13 +246,13 @@ pub fn data_dependency<'a>(stbgr: &'a StacklessBytecodeGenerator, idx: usize) ->
                             let node = data_depent.get(*src);
                             nodes.push(node);
                         }
-                        let node = Node::newy_with_nodes(Val::Oper(oper.clone()), nodes);
+                        let node = Node::newy_with_nodes(Val::ByteCode(code.clone()), nodes);
                         data_depent.insert_or_modify(dsts[0], node);
                     },
                     Unpack(_, _, _) => { // 1 -> n
                         let node = data_depent.get(srcs[0]);
                         let nodes = vec![node];
-                        let node = Node::newy_with_nodes(Val::Oper(oper.clone()), nodes);
+                        let node = Node::newy_with_nodes(Val::ByteCode(code.clone()), nodes);
                         for dst in dsts {
                             data_depent.insert_or_modify(*dst, node.clone());
 
@@ -240,7 +261,7 @@ pub fn data_dependency<'a>(stbgr: &'a StacklessBytecodeGenerator, idx: usize) ->
                     Exists(_, _, _) | FreezeRef | BorrowField(_, _, _, _) | BorrowLoc | // 1 -> 1
                         ReadRef | BorrowGlobal(_, _, _) | MoveFrom(_, _, _) => {
                         let node = data_depent.get(srcs[0]);
-                        let node = Node::new_with_node(Val::Oper(oper.clone()), node);
+                        let node = Node::new_with_node(Val::ByteCode(code.clone()), node);
                         data_depent.insert_or_modify(dsts[0], node);
                     },
                     _ => {

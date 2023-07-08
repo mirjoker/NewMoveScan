@@ -1,10 +1,11 @@
 // infinite_loop
 
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, vec};
 
-use move_stackless_bytecode::{stackless_control_flow_graph::BlockContent, stackless_bytecode::Bytecode};
+use move_model::ty::Type;
+use move_stackless_bytecode::{stackless_control_flow_graph::BlockContent, stackless_bytecode::{Bytecode, AssignKind, Operation}};
 
-use crate::move_ir::{generate_bytecode::StacklessBytecodeGenerator, fatloop::get_loops, data_dependency::data_dependency, control_flow_graph::BlockId};
+use crate::{move_ir::{generate_bytecode::{StacklessBytecodeGenerator, FunctionInfo}, fatloop::get_loops, data_dependency::data_dependency, control_flow_graph::BlockId}};
 
 
 pub fn detect_infinite_loop(stbgr: &StacklessBytecodeGenerator, idx: usize) -> bool {
@@ -14,73 +15,130 @@ pub fn detect_infinite_loop(stbgr: &StacklessBytecodeGenerator, idx: usize) -> b
     let cfg = function.cfg.as_ref().unwrap();
     let mut ret_flag = if fat_loops.fat_loops.len() > 0 {true} else {false};
     for (bid, fat_loop) in fat_loops.fat_loops.iter() {
-        let mut branchs = vec![];
+        let mut branchs: BTreeSet<BlockId> = BTreeSet::new();
         let mut unions: BTreeSet<BlockId> = BTreeSet::new();
-        for natural_loop in natural_loops.iter() {
-            let header = natural_loop.loop_header;
+        // 循环体中所有的block
+        for natural_loop in fat_loop.sub_loops.iter() {
             let bodys = natural_loop.loop_body.clone();
-            if header == *bid {
-                unions.append(&mut bodys.clone());
-            }
+            unions.append(&mut bodys.clone());
         }
+        // 可能跳出循环的条件
         for union in unions.iter() {
             let children = cfg.successors(*union);
             for child in children {
                 if !unions.contains(child) {
-                    branchs.push(*union);
+                    branchs.insert(*union);
                 }
             }
         }
 
-        for branch in branchs.iter() {
-            let content = cfg.content(*branch);
-            let (mut lower, mut upper) = (0, 0);
-            match content {
-                BlockContent::Basic { lower: _lower, upper: _upper } => {
-                    lower = *_lower;
-                    upper = *_upper;
-                },
-                _ => { continue; }
+        let mut conditions = vec![];
+        for natural_loop in fat_loop.sub_loops.iter() {
+            for bid in natural_loop.loop_body.iter() {
+                let content = cfg.content(*bid);
+                if branchs.contains(bid) {
+                    let (mut l, mut u): (u16, u16) = (0, 0);
+                    if let BlockContent::Basic { lower, upper } = content {
+                        l = *lower;
+                        u = *upper;
+                    }
+                    // 条件分支语句
+                    let instr = &function.code[u as usize];
+                    if let Bytecode::Branch(_, _, _, src) = instr {
+                        let cond = data_depent.get(*src);
+                        cond.loop_condition_from_copy(&mut conditions);
+                    }
+                }
             }
-            let bc = &function.code[upper as usize];
-            // println!("{:?}", bc);
-            // println!("{:#?}",fat_loop.mut_targets.values());
-            // println!("{:#?}", fat_loop.val_targets);
-            match bc {
-                Bytecode::Branch(_, _, _, src) => {
-                    let cond = data_depent.get(*src);
-                    // let mut res = "".to_string();
-                    // cond.display(&mut res, stbgr);
-                    // println!("{}", res);
-                    let mut conditions = vec![];
-                    cond.loop_condition_from_copy(&mut conditions);
-                    if conditions.len() == 0 {
-                        continue;
-                    }
-                    for condition in conditions {
-                        for block_id in unions.iter() {
-                            let content = cfg.content(*block_id);
-                            match content {
-                                BlockContent::Basic { lower, upper } => {
-                                    for offset in *lower..*upper {
-                                        match function.code[offset as usize] {
-                                            Bytecode::Assign(_, dst, _, _) => {
-                                                if dst == condition {
-                                                    ret_flag = false;
-                                                }
-                                            },
-                                            _ => {}
-                                        }
-                                    }
-                                },
-                                _ => {}
-                            }
-                        }
-                    }
-                },
-                _ => {}
+        }
+
+        for natural_loop in fat_loop.sub_loops.iter() {
+            for bid in natural_loop.loop_body.iter() {
+                for condition in conditions.iter() {
+                    let content = cfg.content(*bid);
+                    ret_flag = ret_flag & changed_loop_condition(function, content, *condition, 0);
+                }
             }
         }
     }
     ret_flag
+}
+
+fn changed_loop_condition(function: &FunctionInfo, content: &BlockContent, condition: usize, offset: u16) -> bool {
+    let mut flag = true;
+    let (mut l, mut u): (u16, u16) = (0, 0);
+    if let BlockContent::Basic { lower, upper } = content {
+        l = *lower;
+        u = *upper;
+    }
+    for i in (l+offset)..u {
+        let instr = &function.code[i as usize];
+        match instr {
+            Bytecode::Assign(_, dst, src, assginkind) => {
+                // 直接进行修改
+                if *dst == condition {
+                    flag = false;
+                } else if *src == condition {
+                    let refer = borrow_reference(instr, &function.local_types);
+                    if let Some((src, dst, _)) = refer {
+                        flag = flag & changed_loop_condition(function, content, dst, i-l+1);
+                    }
+                }
+            },
+            Bytecode::Call(_, dsts, oper, srcs, _) => {
+                let refer = borrow_reference(instr, &function.local_types);
+                if let Some((src, dst, _)) = refer {
+                    if src == condition {
+                        flag = flag & changed_loop_condition(function, content, dst, i-l+1);
+                    }
+                }
+                if let Operation::Function(_, _, _) = oper {
+                    if srcs.contains(&condition) {
+                        flag = false;
+                    }
+                }
+            },
+            _ => {}
+        }
+    }
+    flag
+}
+
+fn borrow_reference(instr: &Bytecode, local_types: &Vec<Type>) ->Option<(usize, usize, bool)> {
+    match instr {
+        Bytecode::Assign(_, dst, src, kind) => {
+            match kind {
+                AssignKind::Move => { None }
+                AssignKind::Copy => { 
+                    if local_types[*src].is_mutable_reference() {
+                        Some((*src, *dst, false))
+                    } else {
+                        None
+                    } 
+                }
+                AssignKind::Store => {
+                    if local_types[*src].is_mutable_reference() {
+                        Some((*src, *dst, false))
+                    } else {
+                        None
+                    }
+                }
+            }
+        }
+        Bytecode::Call(_, dsts, oper, srcs, _) => {
+            match oper {
+                Operation::BorrowLoc => {
+                    Some((srcs[0], dsts[0], false))
+                }
+                Operation::BorrowGlobal(_, _, _) => {
+                    Some((srcs[0], dsts[0], false))
+                }
+                Operation::BorrowField(_, _, _, _) => {
+                    Some((srcs[0], dsts[0], true))
+                }
+                _ => { None }
+            }
+        }
+        _ => { None }
+    }
 }

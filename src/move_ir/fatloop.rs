@@ -15,6 +15,7 @@ pub struct FatLoop {
     pub val_targets: BTreeSet<TempIndex>,
     pub mut_targets: BTreeMap<TempIndex, bool>,
     pub back_edges: BTreeSet<CodeOffset>,
+    pub sub_loops: Vec<NaturalLoop<BlockId>>
 }
 
 #[derive(Debug, Clone)]
@@ -249,6 +250,7 @@ pub fn get_loops(function: &FunctionInfo) -> (Vec<NaturalLoop<u16>>, LoopAnnotat
                 val_targets,
                 mut_targets,
                 back_edges,
+                sub_loops
             },
         );
     }
