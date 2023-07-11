@@ -17,7 +17,9 @@ use MoveScanner::{
         }
 };
 use itertools::Itertools;
-use move_binary_format::{access::ModuleAccess, CompiledModule};
+use petgraph::dot::{Config, Dot};
+use petgraph::graph::Graph;
+use move_binary_format::{access::ModuleAccess, CompiledModule, file_format::FunctionDefinitionIndex};
 
 fn main() {
     let cli = Cli::parse();
@@ -50,14 +52,37 @@ fn main() {
                         }
                     },
                     Some(Infos::IR) => {
+                        stbgr.set_display_body(true);
                         println!("{}", stbgr);
                     },
-                    Some(Infos::CompileModule) => {
+                    Some(Infos::CM) => {
                         println!("{:#?}", cm);
                     },
-                    _ => {
-                        continue;
+                    Some(Infos::FNs) => {
+                        stbgr.set_display_body(false);
+                        println!("{}", stbgr);
+                    },
+                    Some(Infos::DU) => {
+                        for (idx, function) in stbgr.functions.iter().enumerate() {
+                            println!("{:?}", &function.def_attrid);
+                            println!("{:?}", &function.use_attrid);
+                        }
+                    },
+                    Some(Infos::CG) => {
+                        // let dot_dir = "./dots";
+                        let graph = stbgr.call_graph2str();
+                        let dot_graph = format!(
+                            "{}",
+                            Dot::with_attr_getters(&graph, &[], &|_, _| "".to_string(), &|_, _| {
+                                "shape=box".to_string()
+                            })
+                        );
+                        let msym = stbgr.module_data.name.name();
+                        let filename = msym.display(&stbgr.symbol_pool).to_string();
+                        let dotfile = PathBuf::from(format!("{}.dot", filename));
+                        fs::write(&dotfile, &dot_graph).expect("generating dot file for CFG");
                     }
+                    _ => {}
                 }
             },
             Some(Commands::Detection { detection }) => {
@@ -119,6 +144,9 @@ fn main() {
                     },
                     None => {
                         for (idx, function) in stbgr.functions.iter().enumerate() {
+                            let func_define = stbgr.module.function_def_at(FunctionDefinitionIndex::new(idx as u16));
+                            if func_define.is_native() { continue; };
+
                             if detect_unchecked_return(function, &stbgr.symbol_pool, idx, &cm) {
                                 detects[0].push(idx);
                             }
@@ -159,6 +187,9 @@ fn main() {
                 println!("============== Handling for {:?} ==============", filename.to_str().unwrap());
                 let mut detects: Vec<Vec<usize>> = vec![Vec::new(); 6];
                 for (idx, function) in stbgr.functions.iter().enumerate() {
+                    let func_define = stbgr.module.function_def_at(FunctionDefinitionIndex::new(idx as u16));
+                    if func_define.is_native() { continue; };
+
                     if detect_unchecked_return(function, &stbgr.symbol_pool, idx, &cm) {
                         detects[0].push(idx);
                     }

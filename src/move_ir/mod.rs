@@ -4,3 +4,4 @@ pub mod  bytecode_display;
 pub mod control_flow_graph;
 pub mod fatloop;
 pub mod data_dependency;
+pub mod utils;

@@ -1,12 +1,19 @@
 use std::{fs, path::PathBuf, io::{BufReader, Read}};
 
 use move_binary_format::{CompiledModule, file_format::Visibility};
-use move_model::model::ModuleEnv;
+use move_model::{model::ModuleEnv, ty::{self, *}};
 
 
 // 依赖的 module 的 address
 const DEPADDRESSES: [&str; 2] = ["0x1::", "0x3::"];
 
+pub struct DotWeight {}
+
+impl std::fmt::Display for DotWeight {
+    fn fmt(&self, _f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        Ok(())
+    }
+}
 
 // get all .mv files in dir and subdir
 pub fn visit_dirs(dir: &PathBuf, paths: &mut Vec<PathBuf>, subdir: bool) {
@@ -57,6 +64,31 @@ pub fn visibility_str(visibility: &Visibility) -> &str {
     }
 }
 
+pub fn display_type(ty: &Type) {
+    match ty {
+        ty::Type::Primitive(_) => {
+            println!("{}", "Primitive");
+        },
+        ty::Type::Tuple(_) => {
+            println!("{}", "Tuple");
+        },
+        ty::Type::Vector(_) => {
+            println!("{}", "Vector");
+        },
+        ty::Type::Struct(_, _, _) => {
+            println!("{}", "Struct");
+        },
+        ty::Type::TypeParameter(_) => {
+            println!("{}", "TypeParameter");
+        },
+        ty::Type::Reference(flag, _) => {
+            println!("{}, {}", flag, "Reference");
+        },
+        _ => {
+            println!("{}", "Else");
+        }
+    }
+}
 
 use anyhow::anyhow;
 use move_stackless_bytecode::{

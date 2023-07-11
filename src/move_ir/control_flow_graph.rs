@@ -1,25 +1,15 @@
-use crate::move_ir::generate_bytecode::StacklessBytecodeGenerator;
+use crate::{move_ir::generate_bytecode::StacklessBytecodeGenerator, utils::utils::DotWeight};
 use move_stackless_bytecode::{
     stackless_bytecode::{Bytecode, Label},
     stackless_control_flow_graph::{StacklessControlFlowGraph, BlockContent},
 };
 use move_binary_format::file_format::CodeOffset;
 use petgraph::{dot::Dot, graph::Graph};
-use std::{collections::{BTreeMap, BTreeSet}, path::PathBuf, fs};
+use std::{collections::BTreeMap, path::PathBuf, fs};
 
 use super::bytecode_display::display;
 use super::generate_bytecode::FunctionInfo;
-type Map<K, V> = BTreeMap<K, V>;
-type Set<V> = BTreeSet<V>;
 pub type BlockId = CodeOffset;
-
-impl<'a> StacklessBytecodeGenerator<'a> {
-    pub fn get_control_flow_graph(&mut self) {
-        for function in self.functions.iter_mut() {
-            function.cfg = Some(StacklessControlFlowGraph::new_forward(&function.code));
-        }
-    }
-}
 
 struct DotCFGBlock<'env> {
     block_id: BlockId,
@@ -73,21 +63,13 @@ pub fn pretty_print_bytecode(
     texts.join("\n")
 }
 
-struct DotCFGEdge {}
-
-impl std::fmt::Display for DotCFGEdge {
-    fn fmt(&self, _f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        Ok(())
-    }
-}
-
 pub fn generate_cfg_in_dot_format<'env>(function: &'env FunctionInfo, dotfile: PathBuf, stbgr: &'env StacklessBytecodeGenerator) {
     let code = &function.code;
     let cfg = StacklessControlFlowGraph::new_forward(code);
     let label_offsets = Bytecode::label_offsets(code);
     let mut graph = Graph::new();
 
-    let mut node_map = Map::new();
+    let mut node_map = BTreeMap::new();
     for (block_id, block) in &cfg.blocks {
         let dot_block = DotCFGBlock {
             block_id: *block_id,
@@ -106,7 +88,7 @@ pub fn generate_cfg_in_dot_format<'env>(function: &'env FunctionInfo, dotfile: P
             graph.add_edge(
                 *node_map.get(block_id).unwrap(),
                 *node_map.get(successor).unwrap(),
-                DotCFGEdge {},
+                DotWeight {},
             );
         }
     }

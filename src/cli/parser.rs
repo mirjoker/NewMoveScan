@@ -33,9 +33,10 @@ pub enum Defects {
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum Infos {
-    IR,
-    CompileModule,
-    CFG,
-    DefUse,
-    FunctionVisibility,
+    IR, // Stackless Bytecode IR
+    CM, // Compile Module
+    CFG, // Control Flow Graph
+    DU, // Tempindex def and use
+    FNs, // Function Signatures
+    CG // Function Call Graph
 }
