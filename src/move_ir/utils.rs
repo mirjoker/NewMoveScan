@@ -468,3 +468,19 @@ pub fn create_move_struct_data(
         spec: Spec::default(),
     }
 }
+
+pub fn get_def_bytecode(function: &FunctionInfo, sid: usize, code_offset: usize) -> &Bytecode {
+    let tid = &function.def_attrid[sid];
+    if tid.len() == 1 {
+        &function.code[tid[0].as_usize()]
+    } else {
+        let closest = tid.iter()
+        .filter(|&x| x.as_usize() < code_offset)
+        .min_by_key(|&x| code_offset - x.as_usize());
+        if let Some(id) = closest {
+            &function.code[id.as_usize()]
+        } else {
+            &function.code[tid[0].as_usize()]
+        }
+    }
+}

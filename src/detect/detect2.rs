@@ -1,6 +1,6 @@
 // overflow
 
-use crate::move_ir::generate_bytecode::FunctionInfo;
+use crate::move_ir::{generate_bytecode::FunctionInfo, utils::get_def_bytecode};
 use move_stackless_bytecode::stackless_bytecode::{
     Bytecode, Operation, Constant
 };
@@ -13,8 +13,8 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
     for (code_offset, bytecode) in function.code.iter().enumerate() {
         match &bytecode {
             Bytecode::Call(_, _ , Operation::Shl, srcs, _) => {
-                let mut oprand1 = get_oprand_bytecode(&function.code, code_offset-1, srcs[0]);
-                let mut oprand2 = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                let mut oprand1 = get_def_bytecode(&function, srcs[0], code_offset);
+                let mut oprand2 = get_def_bytecode(&function, srcs[1], code_offset);
                 // 先判断oprand2的情况(是否是常量，是否有类型转换，是否有mod)
                 if is_ldconst(oprand2) {
                     // 如果oprand2是常量，意味着移位的位数是固定的
@@ -70,7 +70,7 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                         match &oprand1 {
                             // oprand1有mod操作
                             Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
-                                let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                let mod_num = get_def_bytecode(&function, srcs[1], code_offset);
                                 if is_ldconst(mod_num) {
                                     let modnum = get_const(mod_num).unwrap()-1;
                                     if modnum.leading_zeros() < (shl_bit as u32) {
@@ -83,10 +83,10 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                             // oprand1有类型转换，src[0]就是原始数据的类型(也就是转换前变量的类型，可以反应转换前变量的范围)
                             Bytecode::Call(_, _, Operation::CastU8, src, _) => {
                                 // 这里可能在类型转换之前有mod操作,判断一下
-                                let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                let tmp_oprand = get_def_bytecode(&function, srcs[0], code_offset);
                                 match &tmp_oprand {
                                     Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
-                                        let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                        let mod_num = get_def_bytecode(&function, srcs[1], code_offset);
                                         if is_ldconst(mod_num) {
                                             let modnum = get_const(mod_num).unwrap()-1;
                                             if modnum.leading_zeros() < (shl_bit as u32) {
@@ -103,10 +103,10 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                             },
                             Bytecode::Call(_, _, Operation::CastU16, src, _) => {
                                 // 这里可能在类型转换之前有mod操作,判断一下
-                                let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                let tmp_oprand = get_def_bytecode(&function, srcs[0], code_offset);
                                 match &tmp_oprand {
                                     Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
-                                        let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                        let mod_num = get_def_bytecode(&function, srcs[1], code_offset);
                                         if is_ldconst(mod_num) {
                                             let modnum = get_const(mod_num).unwrap()-1;
                                             if modnum.leading_zeros() < (shl_bit as u32) {
@@ -123,10 +123,10 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                             },
                             Bytecode::Call(_, _, Operation::CastU32, src, _) => {
                                 // 这里可能在类型转换之前有mod操作,判断一下
-                                let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                let tmp_oprand = get_def_bytecode(&function, srcs[0], code_offset);
                                 match &tmp_oprand {
                                     Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
-                                        let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                        let mod_num = get_def_bytecode(&function, srcs[1], code_offset);
                                         if is_ldconst(mod_num) {
                                             let modnum = get_const(mod_num).unwrap()-1;
                                             if modnum.leading_zeros() < (shl_bit as u32) {
@@ -143,10 +143,10 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                             },
                             Bytecode::Call(_, _, Operation::CastU64, src, _) => {
                                 // 这里可能在类型转换之前有mod操作,判断一下
-                                let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                let tmp_oprand = get_def_bytecode(&function, srcs[0], code_offset);
                                 match &tmp_oprand {
                                     Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
-                                        let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                        let mod_num = get_def_bytecode(&function, srcs[1], code_offset);
                                         if is_ldconst(mod_num) {
                                             let modnum = get_const(mod_num).unwrap()-1;
                                             if modnum.leading_zeros() < (shl_bit as u32) {
@@ -163,10 +163,10 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                             },
                             Bytecode::Call(_, _, Operation::CastU128, src, _) => {
                                 // 这里可能在类型转换之前有mod操作,判断一下
-                                let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                let tmp_oprand = get_def_bytecode(&function, srcs[0], code_offset);
                                 match &tmp_oprand {
                                     Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
-                                        let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                        let mod_num = get_def_bytecode(&function, srcs[1], code_offset);
                                         if is_ldconst(mod_num) {
                                             let modnum = get_const(mod_num).unwrap()-1;
                                             if modnum.leading_zeros() < (shl_bit as u32) {
@@ -183,10 +183,10 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                             }, 
                             Bytecode::Call(_, _, Operation::CastU256, src, _) => {
                                 // 这里可能在类型转换之前有mod操作,判断一下
-                                let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                let tmp_oprand = get_def_bytecode(&function, srcs[0], code_offset);
                                 match &tmp_oprand {
                                     Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
-                                        let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                        let mod_num = get_def_bytecode(&function, srcs[1], code_offset);
                                         if is_ldconst(mod_num) {
                                             let modnum = get_const(mod_num).unwrap()-1;
                                             if modnum.leading_zeros() < (shl_bit as u32) {
@@ -210,8 +210,8 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                     // oprand2不是常量，这里可能有类型转换，或者mod
                     match &oprand2 {
                         // 先排除一个类型转换
-                        Bytecode::Call(_, _, Operation::CastU8, src, _) => {
-                            oprand2 = get_oprand_bytecode(&function.code, code_offset, src[0]);
+                        Bytecode::Call(_, _, Operation::CastU8, srcs, _) => {
+                            oprand2 = get_def_bytecode(&function, srcs[0], code_offset);
                         },
                         _ => {
                         }
@@ -219,7 +219,7 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                     // 类型转换完后可能存在mod
                     match &oprand2 {
                         Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
-                            let op2_mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                            let op2_mod_num = get_def_bytecode(&function, srcs[1], code_offset);
                             if is_ldconst(op2_mod_num) {
                                 let op2modnum = get_const_u64(op2_mod_num).unwrap()-1;
                                 if is_ldconst(oprand1) {
@@ -272,7 +272,7 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                                     match &oprand1 {
                                         // oprand1有mod操作
                                         Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
-                                            let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                            let mod_num = get_def_bytecode(&function, srcs[1], code_offset);
                                             if is_ldconst(mod_num) {
                                                 let modnum = get_const(mod_num).unwrap()-1;
                                                 if modnum.leading_zeros() < (op2modnum as u32) {
@@ -285,10 +285,10 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                                         // oprand1有类型转换，src[0]就是原始数据的类型(也就是转换前变量的类型，可以反应转换前变量的范围)
                                         Bytecode::Call(_, _, Operation::CastU8, src, _) => {
                                             // 这里可能在类型转换之前有mod操作,判断一下
-                                            let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                            let tmp_oprand = get_def_bytecode(&function, srcs[0], code_offset);
                                             match &tmp_oprand {
                                                 Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
-                                                    let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                                    let mod_num = get_def_bytecode(&function, srcs[1], code_offset);
                                                     if is_ldconst(mod_num) {
                                                         let modnum = get_const(mod_num).unwrap()-1;
                                                         if modnum.leading_zeros() < (op2modnum as u32) {
@@ -305,10 +305,10 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                                         },
                                         Bytecode::Call(_, _, Operation::CastU16, src, _) => {
                                             // 这里可能在类型转换之前有mod操作,判断一下
-                                            let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                            let tmp_oprand = get_def_bytecode(&function, srcs[0], code_offset);
                                             match &tmp_oprand {
                                                 Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
-                                                    let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                                    let mod_num = get_def_bytecode(&function, srcs[1], code_offset);
                                                     if is_ldconst(mod_num) {
                                                         let modnum = get_const(mod_num).unwrap()-1;
                                                         if modnum.leading_zeros() < (op2modnum as u32) {
@@ -325,10 +325,10 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                                         },
                                         Bytecode::Call(_, _, Operation::CastU32, src, _) => {
                                             // 这里可能在类型转换之前有mod操作,判断一下
-                                            let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                            let tmp_oprand = get_def_bytecode(&function, srcs[0], code_offset);
                                             match &tmp_oprand {
                                                 Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
-                                                    let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                                    let mod_num = get_def_bytecode(&function, srcs[1], code_offset);
                                                     if is_ldconst(mod_num) {
                                                         let modnum = get_const(mod_num).unwrap()-1;
                                                         if modnum.leading_zeros() < (op2modnum as u32) {
@@ -345,10 +345,10 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                                         },
                                         Bytecode::Call(_, _, Operation::CastU64, src, _) => {
                                             // 这里可能在类型转换之前有mod操作,判断一下
-                                            let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                            let tmp_oprand = get_def_bytecode(&function, srcs[0], code_offset);
                                             match &tmp_oprand {
                                                 Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
-                                                    let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                                    let mod_num = get_def_bytecode(&function, srcs[1], code_offset);
                                                     if is_ldconst(mod_num) {
                                                         let modnum = get_const(mod_num).unwrap()-1;
                                                         if modnum.leading_zeros() < (op2modnum as u32) {
@@ -365,10 +365,10 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                                         },
                                         Bytecode::Call(_, _, Operation::CastU128, src, _) => {
                                             // 这里可能在类型转换之前有mod操作,判断一下
-                                            let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                            let tmp_oprand = get_def_bytecode(&function, srcs[0], code_offset);
                                             match &tmp_oprand {
                                                 Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
-                                                    let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                                    let mod_num = get_def_bytecode(&function, srcs[1], code_offset);
                                                     if is_ldconst(mod_num) {
                                                         let modnum = get_const(mod_num).unwrap()-1;
                                                         if modnum.leading_zeros() < (op2modnum as u32) {
@@ -385,10 +385,10 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
                                         }, 
                                         Bytecode::Call(_, _, Operation::CastU256, src, _) => {
                                             // 这里可能在类型转换之前有mod操作,判断一下
-                                            let tmp_oprand = get_oprand_bytecode(&function.code, code_offset, srcs[0]);
+                                            let tmp_oprand = get_def_bytecode(&function, srcs[0], code_offset);
                                             match &tmp_oprand {
                                                 Bytecode::Call(_, _, Operation::Mod, srcs, _) => {
-                                                    let mod_num = get_oprand_bytecode(&function.code, code_offset, srcs[1]);
+                                                    let mod_num = get_def_bytecode(&function, srcs[1], code_offset);
                                                     if is_ldconst(mod_num) {
                                                         let modnum = get_const(mod_num).unwrap()-1;
                                                         if modnum.leading_zeros() < (op2modnum as u32) {
@@ -426,43 +426,6 @@ pub fn detect_overflow(function: &FunctionInfo) -> bool {
         }
     }
     ret_flag
-}
-
-fn get_oprand_bytecode(bytecodes: &Vec<Bytecode>, code_offset: usize, src_idx: usize) -> &Bytecode {
-    let mut tmp_index = code_offset - 1;
-    while tmp_index!=0 {
-        match &bytecodes[tmp_index] {
-            Bytecode::Call(_, dst, _, _, _) => {
-                if dst[0] == src_idx  {
-                    return &bytecodes[tmp_index];
-                } else {
-                    tmp_index = tmp_index - 1;
-                    continue;
-                }
-            },
-            Bytecode::Assign(_, dst, _, _) => {
-                if *dst == src_idx {
-                    return &bytecodes[tmp_index];
-                } else {
-                    tmp_index = tmp_index - 1;
-                    continue;
-                }
-            },
-            Bytecode::Load(_, dst, _) => {
-                if *dst == src_idx {
-                    return &bytecodes[tmp_index];
-                } else {
-                    tmp_index = tmp_index - 1;
-                    continue;
-                }
-            },
-            _ => {
-                tmp_index = tmp_index - 1;
-                continue;
-            }
-        }
-    }
-    return &bytecodes[tmp_index];
 }
 
 fn is_ldconst(bytecode: &Bytecode) -> bool {
