@@ -195,12 +195,16 @@ pub fn data_dependency<'a>(packages: &Packages, stbgr: &'a StacklessBytecodeGene
             }
             Call(_, dsts, oper, srcs, _) => {
                 match oper {
+                    // 简单的跨函数分析，如果结果来自函数调用的结果，则进入函数内部通过return指令拿到返回值的依赖
                     Function(mid, fid, _) => {
-                        let mut nodes = vec![];
+                        let mut nodes: Vec<Node> = vec![];
+                        // packages通过ModuleName找到被调函数的module
                         let mname = &stbgr.module_names[mid.to_usize()];
                         let mname = mname.display(&stbgr.symbol_pool).to_string();
                         let option_stbgr = packages.get_stbgr_by_mname(mname.clone());
+                        // 如果有这个module存在，则去找这个函数，如果不存在，按照原来的处理逻辑
                         if let Some(other_stbgr) = option_stbgr {
+                            // 拿到被调函数，计算data_dependency
                             let other_funtion = packages.get_function(mname, *fid);
                             let other_dd = data_dependency(packages, *other_stbgr, other_funtion.idx);
                             if let Some(Bytecode::Ret(_, rets)) = other_funtion.code.last() {
