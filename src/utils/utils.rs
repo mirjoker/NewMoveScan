@@ -66,8 +66,39 @@ pub fn visibility_str(visibility: &Visibility) -> &str {
 
 pub fn display_type(ty: &Type) {
     match ty {
-        ty::Type::Primitive(_) => {
-            println!("{}", "Primitive");
+        ty::Type::Primitive(base_ty) => {
+            match base_ty {
+                PrimitiveType::Bool => {
+                    println!("{}", "Bool"); 
+                }
+                PrimitiveType::U8 => {
+                    println!("{}", "U8"); 
+                }
+                PrimitiveType::U16 => {
+                    println!("{}", "U16"); 
+                }
+                PrimitiveType::U32 => {
+                    println!("{}", "Bool"); 
+                }
+                PrimitiveType::U64 => {
+                    println!("{}", "U64"); 
+                }
+                PrimitiveType::U128 => {
+                    println!("{}", "U128"); 
+                }
+                PrimitiveType::U256 => {
+                    println!("{}", "U256"); 
+                }
+                PrimitiveType::Address => {
+                    println!("{}", "Address"); 
+                }
+                PrimitiveType::Signer => {
+                    println!("{}", "Signer"); 
+                }
+                _ => {
+                    println!("{}", "Else"); 
+                }
+            }
         },
         ty::Type::Tuple(_) => {
             println!("{}", "Tuple");

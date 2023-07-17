@@ -34,19 +34,23 @@ pub fn addr_to_big_uint(addr: &AccountAddress) -> BigUint {
 }
 
 pub struct FunctionInfo {
+    pub idx: usize,
+    pub args_count: usize,
     pub code: Vec<Bytecode>,
     pub local_types: Vec<Type>,
     pub location_table: BTreeMap<AttrId, Loc>,
     pub loop_invariants: BTreeSet<AttrId>,
     pub fallthrough_labels: BTreeSet<Label>,
     pub cfg: Option<StacklessControlFlowGraph>,
-    pub def_attrid: Vec<Vec<AttrId>>,
-    pub use_attrid: Vec<Vec<AttrId>>,
+    pub def_attrid: Vec<Vec<usize>>,
+    pub use_attrid: Vec<Vec<usize>>,
 }
 
 impl FunctionInfo {
-    pub fn new() -> Self {
+    pub fn new(idx: usize) -> Self {
         FunctionInfo {
+            idx,
+            args_count: 0,
             code: vec![],
             local_types: vec![],
             location_table: BTreeMap::new(),
@@ -71,9 +75,6 @@ pub struct StacklessBytecodeGenerator<'a> {
     pub module_names: Vec<ModuleName>, // 所有的module handle
     pub func_to_node: BTreeMap<QualifiedId<FunId>, NodeIndex>,
     pub call_graph: Graph<QualifiedId<FunId>, ()>,
-
-    pub display_one_or_all: Option<usize>,
-    pub display_function_body: bool,
 
     pub vec_module_id: ModuleId, // vector module id
 
@@ -181,8 +182,6 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             module_names,
             vec_module_id: vec_module_id_opt.unwrap(),
             functions: vec![],
-            display_one_or_all: None,
-            display_function_body: true,
             func_to_node: BTreeMap::new(),
             call_graph: Graph::new(),
         }
@@ -192,7 +191,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         for (idx, func_def) in self.module.function_defs.iter().enumerate() {
             let func_def_idx = FunctionDefinitionIndex::new(idx as u16);
             let view = FunctionDefinitionView::new(self.module, func_def);
-            let mut function = FunctionInfo::new();
+            let mut function = FunctionInfo::new(idx);
             let local_count = match view.locals_signature() {
                 Some(locals_view) => locals_view.len(),
                 None => view.parameters().len(),
@@ -201,6 +200,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 .map(|i| self.get_local_type(&view, i))
                 .collect_vec();
             self.temp_count = local_types.len();
+            function.args_count = local_types.len();
             function.local_types = local_types;
 
             let original_code = match &func_def.code {
@@ -241,43 +241,6 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 );
             }
 
-            let n_ty = function.local_types.len();
-            let mut def_attrid: Vec<Vec<AttrId>> = vec![vec![]; n_ty];
-            let mut use_attrid: Vec<Vec<AttrId>> = vec![vec![]; n_ty];
-            for code in &function.code {
-                match code {
-                    Bytecode::Assign(attrid, dst, src, _) => {
-                        def_attrid[*dst].push(*attrid);
-                        use_attrid[*src].push(*attrid);
-                    }
-                    Bytecode::Call(attrid, dsts, _, srcs, _) => {
-                        dsts.iter().for_each(|dst| {
-                            def_attrid[*dst].push(*attrid);
-                        });
-                        srcs.iter().for_each(|src| {
-                            use_attrid[*src].push(*attrid);
-                        });
-                    }
-                    Bytecode::Ret(attrid, srcs) => {
-                        srcs.iter().for_each(|src| {
-                            use_attrid[*src].push(*attrid);
-                        });
-                    }
-                    Bytecode::Load(attrid, dst, _) => {
-                        def_attrid[*dst].push(*attrid);
-                    }
-                    Bytecode::Branch(attrid, _, _, src) => {
-                        use_attrid[*src].push(*attrid);
-                    }
-                    Bytecode::Abort(attrid, src) => {
-                        use_attrid[*src].push(*attrid);
-                    }
-                    _ => {}
-                }
-            }
-            function.def_attrid = def_attrid;
-            function.use_attrid = use_attrid;
-
             // Eliminate fall-through for non-branching instructions
             let code = std::mem::take(&mut function.code);
             for bytecode in code.into_iter() {
@@ -290,6 +253,45 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 }
                 function.code.push(bytecode);
             }
+
+            let n_ty = function.local_types.len();
+            let mut def_attrid: Vec<Vec<usize>> = vec![vec![]; n_ty];
+            let mut use_attrid: Vec<Vec<usize>> = vec![vec![]; n_ty];
+            for (offset, code) in function.code.iter().enumerate() {
+                match code {
+                    Bytecode::Assign(_, dst, src, _) => {
+                        def_attrid[*dst].push(offset);
+                        use_attrid[*src].push(offset);
+                    }
+                    Bytecode::Call(_, dsts, _, srcs, _) => {
+                        dsts.iter().for_each(|dst| {
+                            def_attrid[*dst].push(offset);
+                        });
+                        srcs.iter().for_each(|src| {
+                            use_attrid[*src].push(offset);
+                        });
+                    }
+                    Bytecode::Ret(_, srcs) => {
+                        srcs.iter().for_each(|src| {
+                            use_attrid[*src].push(offset);
+                        });
+                    }
+                    Bytecode::Load(_, dst, _) => {
+                        def_attrid[*dst].push(offset);
+                    }
+                    Bytecode::Branch(_, _, _, src) => {
+                        use_attrid[*src].push(offset);
+                    }
+                    Bytecode::Abort(_, src) => {
+                        use_attrid[*src].push(offset);
+                    }
+                    _ => {}
+                }
+            }
+
+            function.def_attrid = def_attrid;
+            function.use_attrid = use_attrid;
+
             self.functions.push(function);
         }
     }

@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use std::{collections::BTreeMap, fmt};
+use std::{collections::BTreeMap, fmt::{self, Write}};
 
 use crate::{move_ir::generate_bytecode::StacklessBytecodeGenerator, utils::utils::DotWeight};
 use move_binary_format::{
@@ -206,14 +206,6 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         }
     }
 
-    pub fn set_display_option(&mut self, idx: usize) {
-        self.display_one_or_all = Some(idx);
-    }
-
-    pub fn set_display_body(&mut self, is_body: bool) {
-        self.display_function_body = is_body;
-    }
-
     pub fn get_local_name(&self, func_def_idx: FunctionDefinitionIndex, idx: usize) -> Symbol {
         let func_id = self.module_data.function_idx_to_id[&func_def_idx];
         let func_data = &self.module_data.function_data[&func_id];
@@ -289,12 +281,11 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         let fname = fid.symbol().display(&self.symbol_pool).to_string();
         format!("{}::{}", mname, fname)
     }
-}
 
-impl<'env> fmt::Display for StacklessBytecodeGenerator<'env> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    pub fn display(&self, display_function_body: bool, display_one_or_all: Option<usize>) -> String {
+        let mut f = String::new();
         let mut idxs = vec![];
-        if let Some(idx) = self.display_one_or_all {
+        if let Some(idx) = display_one_or_all {
             // display idx function
             idxs.push(FunctionDefinitionIndex::new(idx as u16));
         } else {
@@ -306,7 +297,7 @@ impl<'env> fmt::Display for StacklessBytecodeGenerator<'env> {
         for idx in idxs.iter() {
             let func_id = self.module_data.function_idx_to_id[idx];
             let func_define = self.module.function_def_at(*idx);
-            let func_data = &self.module_data.function_data[&func_id];
+            let func_data: &move_model::model::FunctionData = &self.module_data.function_data[&func_id];
             let function = &self.functions[idx.into_index()];
             let view = FunctionDefinitionView::new(self.module, func_define);
             let modifier = if func_define.is_native() {
@@ -323,22 +314,22 @@ impl<'env> fmt::Display for StacklessBytecodeGenerator<'env> {
                 modifier,
                 self.module_data.name.display(&self.symbol_pool),
                 func_data.name.display(&self.symbol_pool)
-            )?;
+            ).unwrap();
             // ghost_type_param_count?
             let tparams_count_all = view.type_parameters().len() + 0;
             let tparams_count_defined = view.type_parameters().len();
             if tparams_count_all != 0 {
-                write!(f, "<")?;
+                write!(f, "<").unwrap();
                 for i in 0..tparams_count_all {
                     if i > 0 {
-                        write!(f, ", ")?;
+                        write!(f, ", ").unwrap();
                     }
-                    write!(f, "#{}", i)?;
+                    write!(f, "#{}", i).unwrap();
                     if i >= tparams_count_defined {
-                        write!(f, "*")?; // denotes a ghost type parameter
+                        write!(f, "*").unwrap(); // denotes a ghost type parameter
                     }
                 }
-                write!(f, ">")?;
+                write!(f, ">").unwrap();
             }
             let tctx = TypeDisplayContext::WithoutEnv {
                 symbol_pool: &self.symbol_pool,
@@ -348,11 +339,11 @@ impl<'env> fmt::Display for StacklessBytecodeGenerator<'env> {
                 Some(locals_view) => locals_view.len(),
                 None => view.parameters().len(),
             };
-            let write_decl = |f: &mut fmt::Formatter<'_>, i: TempIndex| {
+            let write_decl = |f: &mut String, i: TempIndex| {
                 let ty_ = &function.local_types[i];
                 let ty = ty_.display(&tctx);
                 if i < user_local_count {
-                    let param = if self.display_function_body {
+                    let param = if display_function_body {
                         format!(
                             "$t{}|{}: {}",
                             i,
@@ -362,54 +353,54 @@ impl<'env> fmt::Display for StacklessBytecodeGenerator<'env> {
                     } else {
                         format!("{}", ty)
                     };
-                    write!(f, "{}", param)
+                    write!(f, "{}", param).unwrap()
                 } else {
-                    let param = if self.display_function_body {
+                    let param = if display_function_body {
                         format!("$t{}: {}", i, ty)
                     } else {
                         format!("{}", ty)
                     };
-                    write!(f, "{}", param)
+                    write!(f, "{}", param).unwrap()
                 }
             };
-            write!(f, "(")?;
+            write!(f, "(").unwrap();
 
             for i in 0..view.arg_tokens().count() {
                 if i > 0 {
-                    write!(f, ", ")?;
+                    write!(f, ", ").unwrap();
                 }
-                write_decl(f, i)?;
+                write_decl(&mut f, i);
             }
-            write!(f, ")")?;
+            write!(f, ")").unwrap();
             if view.return_count() > 0 {
-                write!(f, ": ")?;
+                write!(f, ": ").unwrap();
                 if view.return_count() > 1 {
-                    write!(f, "(")?;
+                    write!(f, "(").unwrap();
                 }
                 let returns = &view.return_().0;
                 for i in 0..view.return_count() {
                     if i > 0 {
-                        write!(f, ", ")?;
+                        write!(f, ", ").unwrap();
                     }
                     write!(
                         f,
                         "{}",
                         self.globalize_signature(&returns[i]).display(&tctx)
-                    )?;
+                    ).unwrap();
                 }
                 if view.return_count() > 1 {
-                    write!(f, ")")?;
+                    write!(f, ")").unwrap();
                 }
             }
-            if self.display_function_body {
+            if display_function_body {
                 if func_define.is_native() {
-                    writeln!(f, ";")?;
+                    writeln!(f, ";").unwrap();
                 } else {
-                    writeln!(f, " {{")?;
+                    writeln!(f, " {{").unwrap();
                     for i in view.arg_tokens().count()..function.local_types.len() {
-                        write!(f, "     var ")?;
-                        write_decl(f, i)?;
-                        writeln!(f)?;
+                        write!(f, "     var ").unwrap();
+                        write_decl(&mut f, i);
+                        writeln!(f).unwrap();
                     }
 
                     let bytecodes = self.functions[idx.into_index()].code.clone();
@@ -420,18 +411,19 @@ impl<'env> fmt::Display for StacklessBytecodeGenerator<'env> {
                             "{:>3}: {}",
                             offset,
                             bytecode_display::display(code, &label_offsets, &self)
-                        )
-                        .unwrap();
+                        ).unwrap();
                     }
-                    writeln!(f, "}}")?;
+                    writeln!(f, "}}").unwrap();
                 }
             } else {
-                writeln!(f)?;
+                writeln!(f).unwrap();
             }
         }
-        Ok(())
+        f
     }
 }
+
+
 
 pub fn create_move_struct_data(
     symbol_pool: &SymbolPool,
@@ -472,15 +464,15 @@ pub fn create_move_struct_data(
 pub fn get_def_bytecode(function: &FunctionInfo, sid: usize, code_offset: usize) -> &Bytecode {
     let tid = &function.def_attrid[sid];
     if tid.len() == 1 {
-        &function.code[tid[0].as_usize()]
+        &function.code[tid[0]]
     } else {
         let closest = tid.iter()
-        .filter(|&x| x.as_usize() < code_offset)
-        .min_by_key(|&x| code_offset - x.as_usize());
+        .filter(|&x| *x < code_offset)
+        .min_by_key(|&x| code_offset - x);
         if let Some(id) = closest {
-            &function.code[id.as_usize()]
+            &function.code[*id]
         } else {
-            &function.code[tid[0].as_usize()]
+            &function.code[tid[0]]
         }
     }
 }
