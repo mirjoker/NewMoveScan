@@ -47,13 +47,13 @@ pub fn is_dep_module(module_env: &ModuleEnv) -> bool {
     return is_dep
 }
 
-pub fn compile_module(filename: PathBuf) -> CompiledModule {
+pub fn compile_module(filename: PathBuf) -> Option<CompiledModule> {
     let f = fs::File::open(filename).unwrap();
     let mut reader = BufReader::new(f);
     let mut buffer = Vec::new();
     reader.read_to_end(&mut buffer).unwrap();
-    let cm = CompiledModule::deserialize(&buffer).unwrap();
-    cm
+    let cm = CompiledModule::deserialize(&buffer);
+    cm.ok()
 }
 
 pub fn visibility_str(visibility: &Visibility) -> &str {

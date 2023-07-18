@@ -37,9 +37,10 @@ fn main() {
 
     let mut cms = Vec::new();
     for filename in paths {
-        println!("Deserializing {:?}...", filename.to_str());
-        let cm = compile_module(filename);
-        cms.push(cm);
+        println!("Deserializing {:?}...", filename);
+        if let Some(cm) = compile_module(filename) {
+            cms.push(cm);
+        }
     }
 
     let mut stbgrs = Vec::new();

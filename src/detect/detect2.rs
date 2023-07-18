@@ -15,7 +15,7 @@ pub fn detect_overflow(
     let function = &stbgr.functions[idx];
     let mut ret_flag = false;
     let local_types = &function.local_types;
-    let dd = data_dependency(packages, stbgr, idx);
+    let dd = data_dependency(packages, stbgr, idx, 1);
     for (_, bytecode) in function.code.iter().enumerate() {
         match &bytecode {
             Bytecode::Call(_, dsts, Operation::Shl, srcs, _) => {

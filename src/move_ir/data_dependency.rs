@@ -1,7 +1,7 @@
 use std::{vec, collections::BTreeMap, str::FromStr, ops::{Rem, Sub, Add, Mul}};
 use ethnum::U256;
 
-use move_binary_format::{access::ModuleAccess, views::FunctionHandleView, file_format::FunctionHandleIndex};
+use move_binary_format::{access::ModuleAccess, views::FunctionHandleView, file_format::{FunctionHandleIndex, FunctionDefinitionIndex}};
 use move_stackless_bytecode::{stackless_bytecode::{
     Bytecode::{self, *}, Operation::{*, self}, Constant, AssignKind,
 }};
@@ -172,11 +172,15 @@ impl DataDepent {
     }
 }
 
-pub fn data_dependency<'a>(packages: &Packages, stbgr: &'a StacklessBytecodeGenerator, idx: usize) -> DataDepent {
+pub fn data_dependency<'a>(packages: &Packages, stbgr: &'a StacklessBytecodeGenerator, idx: usize, cnt: usize) -> DataDepent {
     let function = &stbgr.functions[idx];
-    let function_handle = stbgr.module.function_handle_at(FunctionHandleIndex::new(idx as u16));
+    let function_handle_idx = FunctionHandleIndex::new(idx as u16);
+    let function_handle = stbgr.module.function_handle_at(function_handle_idx);
     let view = FunctionHandleView::new(stbgr.module, function_handle);
     let mut data_depent = DataDepent{ data: BTreeMap::new() };
+
+    let function_defintion_idx = FunctionDefinitionIndex::new(idx as u16);
+    let self_fid = stbgr.module_data.function_idx_to_id.get(&function_defintion_idx).unwrap();
 
     // 记录函数参数类型
     for i in 0..view.arg_count() {
@@ -202,21 +206,29 @@ pub fn data_dependency<'a>(packages: &Packages, stbgr: &'a StacklessBytecodeGene
                         let mname = &stbgr.module_names[mid.to_usize()];
                         let mname = mname.display(&stbgr.symbol_pool).to_string();
                         let option_stbgr = packages.get_stbgr_by_mname(mname.clone());
-                        // 如果有这个module存在，则去找这个函数，如果不存在，按照原来的处理逻辑
-                        if let Some(other_stbgr) = option_stbgr {
-                            // 拿到被调函数，计算data_dependency
-                            let other_funtion = packages.get_function(mname, *fid);
-                            let other_dd = data_dependency(packages, *other_stbgr, other_funtion.idx);
-                            if let Some(Bytecode::Ret(_, rets)) = other_funtion.code.last() {
-                                for i in 0..rets.len() {
-                                    let node = other_dd.get(rets[i]);
-                                    nodes.push(node);
-                                }
-                            }
-                        } else {
+                        // 避免调用过程出现循环
+                        if cnt > 0 {
                             for src in srcs {
                                 let node = data_depent.get(*src);
                                 nodes.push(node);
+                            }
+                        } else {
+                            // 如果有这个module存在，则去找这个函数，如果不存在，按照原来的处理逻辑
+                            if let Some(other_stbgr) = option_stbgr {
+                                // 拿到被调函数，计算data_dependency
+                                let other_funtion = packages.get_function(mname, *fid);
+                                let other_dd = data_dependency(packages, *other_stbgr, other_funtion.idx, cnt-1);
+                                if let Some(Bytecode::Ret(_, rets)) = other_funtion.code.last() {
+                                    for i in 0..rets.len() {
+                                        let node = other_dd.get(rets[i]);
+                                        nodes.push(node);
+                                    }
+                                }
+                            } else {
+                                for src in srcs {
+                                    let node = data_depent.get(*src);
+                                    nodes.push(node);
+                                }
                             }
                         }
                         for dst in dsts {

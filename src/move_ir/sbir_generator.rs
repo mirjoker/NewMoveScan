@@ -81,8 +81,9 @@ impl MoveScanner {
         utils::visit_dirs(&dep_dir, &mut paths, true);
     
         for filename in paths {
-            let cm = compile_module(filename);
-            all_modules.push(cm);
+            if let Some(cm) = compile_module(filename) {
+                all_modules.push(cm);
+            }
         }
 
         // for md in &all_modules {

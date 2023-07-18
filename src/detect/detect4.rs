@@ -11,7 +11,7 @@ use crate::{move_ir::{generate_bytecode::{StacklessBytecodeGenerator, FunctionIn
 pub fn detect_infinite_loop(packages: &Packages, stbgr: &StacklessBytecodeGenerator, idx: usize) -> bool {
     let function = &stbgr.functions[idx];
     let (natural_loops, fat_loops) = get_loops(function);
-    let data_depent = data_dependency(packages, stbgr, idx);
+    let data_depent = data_dependency(packages, stbgr, idx, 1);
     let cfg = function.cfg.as_ref().unwrap();
     let mut ret_flag = if fat_loops.fat_loops.len() > 0 {true} else {false};
     for (bid, fat_loop) in fat_loops.fat_loops.iter() {
