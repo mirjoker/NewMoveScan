@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 use itertools::Itertools;
 use move_binary_format::{file_format::FunctionDefinitionIndex, access::ModuleAccess, CompiledModule};
-use crate::{utils::utils::{self, compile_module}, move_ir::{generate_bytecode::StacklessBytecodeGenerator, packages::Packages}, detect::{detect1::detect_unchecked_return, detect2::detect_overflow, detect3::detect_precision_loss, detect4::detect_infinite_loop, detect7::detect_unnecessary_type_conversion, detect8::detect_unnecessary_bool_judgment, detect5::detect_unused_constants, detect6::detect_unused_private_functions}};
+use crate::{utils::utils::{self, compile_module}, move_ir::{generate_bytecode::StacklessBytecodeGenerator, packages::Packages}, 
+detect::{detect1::detect_unchecked_return, detect2::detect_overflow, detect3::detect_precision_loss, detect4::detect_infinite_loop, 
+    detect7::detect_unnecessary_type_conversion, detect8::detect_unnecessary_bool_judgment, detect5::detect_unused_constants, detect6::detect_unused_private_functions}};
 use std::time::{Duration, Instant};
 
 #[test]
@@ -12,6 +14,7 @@ fn test_for_online_bytecodes() {
     utils::visit_dirs(&dir, &mut paths, false);
     let mut bytecode_cnt = 0;
     let mut func_cnt = 0;
+    let mut native_func_cnt = 0;
     let mut defects_cnt = vec![0,0,0,0,0,0,0,0];
     let defects_name = vec!["unckecked return","overflow","precision loss","infinite loop",
     "unnecessary type conversion","unnecessary bool judgment","unused constants","unused private functions"];
@@ -25,18 +28,15 @@ fn test_for_online_bytecodes() {
         let mut packages = Packages::new();
         packages.insert_stbgr(&stbgr);
         for (_, &stbgr) in packages.get_all_stbgr().iter(){
-            let mname = stbgr.module_data.name.name();
-            // println!(
-            //     "============== Handling for {} ==============",
-            //     mname.display(&stbgr.symbol_pool)
-            // );
             for (idx, function) in stbgr.functions.iter().enumerate() {
                 func_cnt += 1;
                 let func_define = stbgr
                     .module
                     .function_def_at(FunctionDefinitionIndex::new(idx as u16));
                 if func_define.is_native() {
+                    native_func_cnt += 1;
                     continue;
+
                 };
 
                 if detect_unchecked_return(function, &stbgr.symbol_pool, idx, stbgr.module) {
@@ -67,12 +67,15 @@ fn test_for_online_bytecodes() {
     }
     println!("bytecode_cnt:{}", bytecode_cnt);
     println!("func_cnt:{}", func_cnt);
+    println!("native_func_cnt:{}", native_func_cnt);
     let mut i = 0;
+    let mut sum = 0;
     while i < 8 {
         println!("{}:{}",defects_name[i],defects_cnt[i]);
+        sum += defects_cnt[i];
         i += 1;
     }
-
+    println!("total:{}", sum);
     let duration = start.elapsed();
     println!("Time elapsed in test_for_online_bytecodes() is: {:?}", duration);
 }
