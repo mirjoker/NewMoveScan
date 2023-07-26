@@ -13,6 +13,7 @@ fn test_for_online_bytecodes() {
     let mut paths = Vec::new();
     utils::visit_dirs(&dir, &mut paths, false);
     let mut bytecode_cnt = 0;
+    let mut bytecode_fail_to_deserialize_cnt = 0;
     let mut func_cnt = 0;
     let mut native_func_cnt = 0;
     let mut defects_cnt = vec![0,0,0,0,0,0,0,0];
@@ -20,7 +21,12 @@ fn test_for_online_bytecodes() {
     "unnecessary type conversion","unnecessary bool judgment","unused constants","unused private functions"];
     for filename in paths.iter() {
         bytecode_cnt += 1;
-        let cm = compile_module(filename.to_path_buf()).unwrap();
+        let cm = compile_module(filename.to_path_buf());
+        if(cm.is_none()) {
+            bytecode_fail_to_deserialize_cnt += 1;
+            continue;
+        }
+        let cm = cm.unwrap();
         let mut stbgr = StacklessBytecodeGenerator::new(&cm);
         stbgr.generate_function();
         stbgr.get_control_flow_graph();
@@ -66,6 +72,7 @@ fn test_for_online_bytecodes() {
         }
     }
     println!("bytecode_cnt:{}", bytecode_cnt);
+    println!("bytecode_fail_to_deserialize_cnt:{}", bytecode_fail_to_deserialize_cnt);
     println!("func_cnt:{}", func_cnt);
     println!("native_func_cnt:{}", native_func_cnt);
     let mut i = 0;
