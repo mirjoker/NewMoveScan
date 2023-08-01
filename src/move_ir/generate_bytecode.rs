@@ -14,7 +14,7 @@ use move_core_types::language_storage::{self, CORE_CODE_ADDRESS};
 use move_model::{
     ast::{ModuleName, QualifiedSymbol, TempIndex},
     model::{FunId, FunctionData, Loc, ModuleData, ModuleId, QualifiedId, StructId},
-    symbol::SymbolPool,
+    symbol::{SymbolPool, Symbol},
     ty::{PrimitiveType, Type},
 };
 use move_stackless_bytecode::{
@@ -27,7 +27,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     vec,
 };
-use super::utils::*;
+use super::{utils::*, data_dependency::DataDepent};
 
 pub fn addr_to_big_uint(addr: &AccountAddress) -> BigUint {
     BigUint::from_str_radix(&addr.to_string(), 16).unwrap()
@@ -35,6 +35,7 @@ pub fn addr_to_big_uint(addr: &AccountAddress) -> BigUint {
 
 pub struct FunctionInfo {
     pub idx: usize,
+    pub name: String,
     pub args_count: usize,
     pub code: Vec<Bytecode>,
     pub local_types: Vec<Type>,
@@ -47,9 +48,10 @@ pub struct FunctionInfo {
 }
 
 impl FunctionInfo {
-    pub fn new(idx: usize) -> Self {
+    pub fn new(idx: usize, name: String) -> Self {
         FunctionInfo {
             idx,
+            name,
             args_count: 0,
             code: vec![],
             local_types: vec![],
@@ -79,6 +81,7 @@ pub struct StacklessBytecodeGenerator<'a> {
     pub vec_module_id: ModuleId, // vector module id
 
     pub functions: Vec<FunctionInfo>,
+    pub data_dependency: Vec<DataDepent>,
 }
 
 impl<'a> StacklessBytecodeGenerator<'a> {
@@ -182,6 +185,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             module_names,
             vec_module_id: vec_module_id_opt.unwrap(),
             functions: vec![],
+            data_dependency: vec![],
             func_to_node: BTreeMap::new(),
             call_graph: Graph::new(),
         }
@@ -191,7 +195,11 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         for (idx, func_def) in self.module.function_defs.iter().enumerate() {
             let func_def_idx = FunctionDefinitionIndex::new(idx as u16);
             let view = FunctionDefinitionView::new(self.module, func_def);
-            let mut function = FunctionInfo::new(idx);
+
+            let handle = self.module.function_handle_at(func_def.function);
+            let fname = self.module.identifier_at(handle.name).to_string();
+
+            let mut function = FunctionInfo::new(idx, fname);
             let local_count = match view.locals_signature() {
                 Some(locals_view) => locals_view.len(),
                 None => view.parameters().len(),

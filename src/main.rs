@@ -1,3 +1,7 @@
+use std::borrow::BorrowMut;
+use std::collections::{BTreeMap, BTreeSet};
+use std::io::Write;
+use std::time::Instant;
 use std::{fmt::format, fs, path::PathBuf, str::FromStr, vec};
 
 use MoveScanner::move_ir::packages::Packages;
@@ -6,6 +10,7 @@ use itertools::Itertools;
 use move_binary_format::{
     access::ModuleAccess, file_format::FunctionDefinitionIndex, CompiledModule,
 };
+use move_bytecode_utils::Modules;
 use petgraph::dot::{Config, Dot};
 use petgraph::graph::Graph;
 use MoveScanner::{
@@ -28,6 +33,7 @@ use MoveScanner::{
     },
     utils::utils::{self, compile_module},
 };
+use serde_json::{json, Value, Map};
 
 fn main() {
     let cli = Cli::parse();
@@ -43,12 +49,17 @@ fn main() {
         }
     }
 
+    // let all_modules = Modules::new(&cms);
+    // let dep_graph = all_modules.compute_dependency_graph();
+    // let modules = dep_graph.compute_topological_order().unwrap();
+
     let mut stbgrs = Vec::new();
     for cm in cms.iter() {
         let mut stbgr = StacklessBytecodeGenerator::new(&cm);
         stbgr.generate_function();
         stbgr.get_control_flow_graph();
         stbgr.build_call_graph();
+        stbgr.get_data_dependency(&mut stbgrs);
         stbgrs.push(stbgr);
     }
 
@@ -57,7 +68,11 @@ fn main() {
         packages.insert_stbgr(stbgr);
     }
 
+    let mut result = Map::new();
     for (mname, &stbgr) in packages.get_all_stbgr().iter(){
+        // 记录每个module的分析市场，函数对应的威胁
+        let mut result2 = Map::new();
+        let start = Instant::now();
         match &cli.command {
             Some(Commands::Printer { printer }) => {
                 match &printer {
@@ -102,20 +117,14 @@ fn main() {
                                 "shape=box".to_string()
                             })
                         );
-                        let msym = stbgr.module_data.name.name();
-                        let filename = msym.display(&stbgr.symbol_pool).to_string();
-                        let dotfile = PathBuf::from(format!("{}.dot", filename));
+                        let dotfile = PathBuf::from(format!("{}.dot", mname));
                         fs::write(&dotfile, &dot_graph).expect("generating dot file for CFG");
                     }
                     _ => {}
                 }
             }
             Some(Commands::Detection { detection }) => {
-                let mname = stbgr.module_data.name.name();
-                println!(
-                    "============== Handling for {} ==============",
-                    mname.display(&stbgr.symbol_pool)
-                );
+                println!("============== Handling for {} ==============", mname);
                 let mut detects: Vec<Vec<usize>> = vec![Vec::new(); 6];
                 match *detection {
                     Some(Defects::UncheckedReturn) => {
@@ -213,12 +222,8 @@ fn main() {
                 }
             }
             None => {
-                let mname = stbgr.module_data.name.name();
-                println!(
-                    "============== Handling for {} ==============",
-                    mname.display(&stbgr.symbol_pool)
-                );
-                let mut detects: Vec<Vec<usize>> = vec![Vec::new(); 6];
+                println!("============== Handling for {} ==============", mname.clone());
+                let mut detects: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); 6];
                 for (idx, function) in stbgr.functions.iter().enumerate() {
                     let func_define = stbgr
                         .module
@@ -228,22 +233,22 @@ fn main() {
                     };
 
                     if detect_unchecked_return(function, &stbgr.symbol_pool, idx, stbgr.module) {
-                        detects[0].push(idx);
+                        detects[0].insert(idx);
                     }
                     if detect_overflow(&packages, &stbgr, idx) {
-                        detects[1].push(idx);
+                        detects[1].insert(idx);
                     }
                     if detect_precision_loss(function, &stbgr.symbol_pool) {
-                        detects[2].push(idx);
+                        detects[2].insert(idx);
                     }
                     if detect_infinite_loop(&packages, &stbgr, idx) {
-                        detects[3].push(idx);
+                        detects[3].insert(idx);
                     }
                     if detect_unnecessary_type_conversion(function, &function.local_types) {
-                        detects[4].push(idx);
+                        detects[4].insert(idx);
                     }
                     if detect_unnecessary_bool_judgment(function, &function.local_types) {
-                        detects[5].push(idx);
+                        detects[5].insert(idx);
                     }
                 }
                 let unused_constants = detect_unused_constants(&stbgr);
@@ -263,21 +268,60 @@ fn main() {
                 }
                 format_result(&detects, stbgr.module);
                 println!("==============================================\n");
+                // json文件
+                result2.insert("Unused constants num".to_string(), Value::Number(unused_constants.len().into()));
+                result2.insert(
+                    "Unused private functions".to_string(), 
+                    Value::Array(
+                        unused_private_function_names
+                        .iter()
+                        .map(|x|
+                            Value::String(x.clone())).collect()
+                        )
+                    );
+                for (idx, function) in stbgr.functions.iter().enumerate() {
+                    let fname = &function.name;
+                    let mut result3 = vec![];
+                    for (i, detect) in detects.iter().enumerate() {
+                        if detect.contains(&idx) {
+                            result3.push(DETECT_TYPES[i]);
+                        }
+                    }
+                    result2.insert(
+                        fname.clone(),
+                        Value::Array(
+                            result3
+                            .iter()
+                            .map(|&x|
+                                Value::String(x.into())).collect()
+                            )
+                        );
+                }
+                let duration = start.elapsed();
+                result2.insert("Times".to_string(), Value::String(format!("{:?}", duration)));
             }
+        }
+        result.insert(mname.clone(), Value::Object(result2));
+
+        if let Some(json_file) = &cli.json_file {
+            let json_output = serde_json::to_string_pretty(&result).unwrap();
+            let mut file = fs::File::create(json_file).expect("Failed to create json file");
+            file.write(json_output.as_bytes()).expect("Failed to write to json file");
         }
     }
 }
 
-fn format_result(detects: &Vec<Vec<usize>>, cm: &CompiledModule) {
-    let detect_types = [
-        "Unchecked return",
-        "Overflow",
-        "Precision loss",
-        "Infinite loop",
-        "Unnecessary type conversion",
-        "Unnecessary bool judgment",
-    ];
-    for (i, d_type) in detect_types.iter().enumerate() {
+static DETECT_TYPES: [&'static str; 6] = [
+    "Unchecked return",
+    "Overflow",
+    "Precision loss",
+    "Infinite loop",
+    "Unnecessary type conversion",
+    "Unnecessary bool judgment",
+];
+
+fn format_result(detects: &Vec<BTreeSet<usize>>, cm: &CompiledModule) {
+    for (i, d_type) in DETECT_TYPES.iter().enumerate() {
         if detects[i].len() == 0 {
             continue;
         }

@@ -1,7 +1,7 @@
 // overflow
 
 use crate::move_ir::{
-    data_dependency::data_dependency, generate_bytecode::StacklessBytecodeGenerator,
+    generate_bytecode::StacklessBytecodeGenerator,
     packages::Packages,
 };
 use move_model::ty::{PrimitiveType, Type};
@@ -15,7 +15,7 @@ pub fn detect_overflow(
     let function = &stbgr.functions[idx];
     let mut ret_flag = false;
     let local_types = &function.local_types;
-    let dd = data_dependency(packages, stbgr, idx, 1);
+    let dd = &stbgr.data_dependency[idx];
     for (_, bytecode) in function.code.iter().enumerate() {
         match &bytecode {
             Bytecode::Call(_, dsts, Operation::Shl, srcs, _) => {

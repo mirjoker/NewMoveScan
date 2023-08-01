@@ -5,7 +5,7 @@ use move_binary_format::{access::ModuleAccess, views::FunctionHandleView, file_f
 use move_stackless_bytecode::{stackless_bytecode::{
     Bytecode::{self, *}, Operation::{*, self}, Constant, AssignKind,
 }};
-use move_model::ty::{Type, TypeDisplayContext, PrimitiveType};
+use move_model::{ty::{Type, TypeDisplayContext, PrimitiveType}, ast::ModuleName};
 
 use crate::utils::utils::display_type;
 
@@ -172,160 +172,192 @@ impl DataDepent {
     }
 }
 
-pub fn data_dependency<'a>(packages: &Packages, stbgr: &'a StacklessBytecodeGenerator, idx: usize, cnt: usize) -> DataDepent {
-    let function = &stbgr.functions[idx];
-    let function_handle_idx = FunctionHandleIndex::new(idx as u16);
-    let function_handle = stbgr.module.function_handle_at(function_handle_idx);
-    let view = FunctionHandleView::new(stbgr.module, function_handle);
-    let mut data_depent = DataDepent{ data: BTreeMap::new() };
+impl<'a> StacklessBytecodeGenerator<'a> {
+    pub fn get_data_dependency(&mut self, stbgrs: &mut Vec<StacklessBytecodeGenerator>) {
+        for (idx, function) in self.functions.iter().enumerate() {
+            let function_handle_idx = FunctionHandleIndex::new(idx as u16);
+            let function_handle = self.module.function_handle_at(function_handle_idx);
+            let view = FunctionHandleView::new(self.module, function_handle);
+            let mut data_depent = DataDepent{ data: BTreeMap::new() };
 
-    let function_defintion_idx = FunctionDefinitionIndex::new(idx as u16);
-    let self_fid = stbgr.module_data.function_idx_to_id.get(&function_defintion_idx).unwrap();
+            let function_defintion_idx = FunctionDefinitionIndex::new(idx as u16);
+            let self_fid = self.module_data.function_idx_to_id.get(&function_defintion_idx).unwrap();
 
-    // 记录函数参数类型
-    for i in 0..view.arg_count() {
-        let ty = &function.local_types[i];
-        let uint_max = get_uint_max(ty);
-        let node = Node::new(Val::ParamType(function.local_types[i].clone()), uint_max, false);
-        data_depent.insert_or_modify(i, node);
-    }
-
-    for code in function.code.iter() {
-        match code {
-            Assign(_, dst, src, _) => {
-                let node = data_depent.get(*src);
-                let node = Node::new_with_node(Val::AssIgn(code.clone()), node.clone(), node.max, false);
-                data_depent.insert_or_modify(*dst, node);
+            // 记录函数参数类型
+            for i in 0..view.arg_count() {
+                let ty = &function.local_types[i];
+                let uint_max = get_uint_max(ty);
+                let node = Node::new(Val::ParamType(function.local_types[i].clone()), uint_max, false);
+                data_depent.insert_or_modify(i, node);
             }
-            Call(_, dsts, oper, srcs, _) => {
-                match oper {
-                    // 简单的跨函数分析，如果结果来自函数调用的结果，则进入函数内部通过return指令拿到返回值的依赖
-                    Function(mid, fid, _) => {
-                        let mut nodes: Vec<Node> = vec![];
-                        // packages通过ModuleName找到被调函数的module
-                        let mname = &stbgr.module_names[mid.to_usize()];
-                        let mname = mname.display(&stbgr.symbol_pool).to_string();
-                        let option_stbgr = packages.get_stbgr_by_mname(mname.clone());
-                        // 避免调用过程出现循环
-                        if cnt > 0 {
-                            for src in srcs {
-                                let node = data_depent.get(*src);
-                                nodes.push(node);
-                            }
-                        } else {
-                            // 如果有这个module存在，则去找这个函数，如果不存在，按照原来的处理逻辑
-                            if let Some(other_stbgr) = option_stbgr {
-                                // 拿到被调函数，计算data_dependency
-                                let other_funtion = packages.get_function(mname, *fid);
-                                let other_dd = data_dependency(packages, *other_stbgr, other_funtion.idx, cnt-1);
-                                if let Some(Bytecode::Ret(_, rets)) = other_funtion.code.last() {
-                                    for i in 0..rets.len() {
-                                        let node = other_dd.get(rets[i]);
+
+            for code in function.code.iter() {
+                match code {
+                    Assign(_, dst, src, _) => {
+                        let node = data_depent.get(*src);
+                        let node = Node::new_with_node(Val::AssIgn(code.clone()), node.clone(), node.max, false);
+                        data_depent.insert_or_modify(*dst, node);
+                    }
+                    Call(_, dsts, oper, srcs, _) => {
+                        match oper {
+                            // 简单的跨函数分析，如果结果来自函数调用的结果，则进入函数内部通过return指令拿到返回值的依赖
+                            Function(mid, fid, _) => {
+                                let mut nodes: Vec<Node> = vec![];
+                                // packages通过ModuleName找到被调函数的module
+                                let mut option_stbgr = None;
+                                let mname = &self.module_names[mid.to_usize()];
+                                for stbgr in stbgrs.iter() {
+                                    if stbgr.module_names[0] == *mname {
+                                        option_stbgr = Some(stbgr);
+                                        break;
+                                    }
+                                }
+
+                                // 如果有这个module存在，则去找这个函数，如果不存在，按照原来的处理逻辑
+                                if let Some(other_stbgr) = option_stbgr {
+                                    // 拿到被调函数的data_dependency
+                                    let mut idx = None;
+                                    for (def_idx, fun_id) in other_stbgr.module_data.function_idx_to_id.iter() {
+                                        if *fid == *fun_id {
+                                            idx = Some(def_idx.0 as usize);
+                                            break;
+                                        }
+                                    }
+                                    if let Some(idx) = idx {
+                                        let other_dd = &other_stbgr.data_dependency[idx];
+                                        let other_funtion = &other_stbgr.functions[idx];
+                                        if let Some(Bytecode::Ret(_, rets)) = other_funtion.code.last() {
+                                            for i in 0..rets.len() {
+                                                let node = other_dd.get(rets[i]);
+                                                nodes.push(node);
+                                            }
+                                        }
+                                    }
+                                } else if mid.to_usize() == 0 { // 本cm的函数
+                                    let mut idx = None;
+                                    for (def_idx, fun_id) in self.module_data.function_idx_to_id.iter() {
+                                        if *fid == *fun_id {
+                                            idx = Some(def_idx.0 as usize);
+                                            break;
+                                        }
+                                    }
+                                    if let Some(idx) = idx {
+                                        if idx < self.data_dependency.len() {
+                                            let other_dd = &self.data_dependency[idx];
+                                            let other_funtion = &self.functions[idx];
+                                            if let Some(Bytecode::Ret(_, rets)) = other_funtion.code.last() {
+                                                for i in 0..rets.len() {
+                                                    let node = other_dd.get(rets[i]);
+                                                    nodes.push(node);
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    for src in srcs {
+                                        let node = data_depent.get(*src);
                                         nodes.push(node);
                                     }
                                 }
-                            } else {
+
+                                for dst in dsts {
+                                    let ty = &function.local_types[*dst];
+                                    let max = get_uint_max(ty);
+                                    let node = Node::newy_with_nodes(Val::ByteCode(code.clone()), nodes.clone(), max, false);
+                                    data_depent.insert_or_modify(*dst, node.clone());
+                                }
+                            },
+                            Operation::Sub | Add | Operation::Mul | Div | Mod | BitOr | BitAnd | Xor | Shl | Shr  => { // 二元操作
+                                let lnode = data_depent.get(srcs[0]);
+                                let rnode = data_depent.get(srcs[1]);
+                                let ty = &function.local_types[dsts[0]];
+                                // println!("{} {}", srcs[0], srcs[1]);
+                                // let mut res = "".to_string();
+                                // rnode.display(&mut res, &stbgr);
+                                // println!("{}", res);
+                                let (max, is_constant) = binary_operation_max(oper, lnode.max, rnode.max, lnode.is_constant, rnode.is_constant, ty);
+                                let node = Node::new_with_binary_nodes(Val::ByteCode(code.clone()), lnode, rnode, max, is_constant);
+                                data_depent.insert_or_modify(dsts[0], node);
+                            },
+                            Lt | Gt | Le | Ge | Or | And | Eq | Neq => { // 二元操作，返回值为bool，参数类型不确定
+                                let lnode = data_depent.get(srcs[0]);
+                                let rnode = data_depent.get(srcs[1]);
+                                let node = Node::new_with_binary_nodes(Val::ByteCode(code.clone()), lnode, rnode, None, false);
+                                data_depent.insert_or_modify(dsts[0], node);
+                            },
+                            CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 => { // 一元操作
+                                let node = data_depent.get(srcs[0]);
+                                // 源数据的最大值和cast的范围，取最小值
+                                let ty = &function.local_types[dsts[0]];
+                                let ty_max = get_uint_max(ty);
+                                let max = get_min_uint(node.max, ty_max);
+                                let is_constant = node.is_constant;
+                                let node = Node::new_with_node(Val::ByteCode(code.clone()), node, max, is_constant);
+                                data_depent.insert_or_modify(dsts[0], node);
+                            },
+                            Not => {
+                                let node = data_depent.get(srcs[0]);
+                                let node = Node::new_with_node(Val::ByteCode(code.clone()), node, None, false);
+                                data_depent.insert_or_modify(dsts[0], node);
+                            },
+                            Pack(_, _, _) => { // n -> 1
+                                let mut nodes = vec![];
                                 for src in srcs {
                                     let node = data_depent.get(*src);
                                     nodes.push(node);
                                 }
+                                let node = Node::newy_with_nodes(Val::ByteCode(code.clone()), nodes, None, false);
+                                data_depent.insert_or_modify(dsts[0], node);
+                            },
+                            Unpack(_, _, _) => { // 1 -> n
+                                let node = data_depent.get(srcs[0]);
+                                for (i, dst) in dsts.iter().enumerate() {
+                                    // 如果结构体来自函数pack操作，可以拿到pack时，每一个成员变量的约束，否则不行
+                                    let ty = &function.local_types[*dst];
+                                    let max = if node.subnodes.len() == dsts.len() {
+                                        if node.subnodes[i].max.is_none() {
+                                            get_uint_max(ty)
+                                        } else {
+                                            node.subnodes[i].max
+                                        }
+                                    } else {
+                                        get_uint_max(ty)
+                                    };
+                                    let node = Node::new_with_node(Val::ByteCode(code.clone()), node.clone(), max, false);
+                                    data_depent.insert_or_modify(*dst, node.clone());
+
+                                }
+                            },
+                            Exists(_, _, _) | FreezeRef | BorrowField(_, _, _, _) | BorrowLoc | // 1 -> 1 TODO
+                                ReadRef | BorrowGlobal(_, _, _) | MoveFrom(_, _, _) => {
+                                let node = data_depent.get(srcs[0]);
+                                let ty = &function.local_types[dsts[0]];
+                                let max = get_uint_max(ty);
+                                let node = Node::new_with_node(Val::ByteCode(code.clone()), node, max, false);
+                                data_depent.insert_or_modify(dsts[0], node);
+                            },
+                            _ => {
+                                // WriteRef MoveTo 2 -> 0
+                                continue;
                             }
                         }
-                        for dst in dsts {
-                            let ty = &function.local_types[*dst];
-                            let max = get_uint_max(ty);
-                            let node = Node::newy_with_nodes(Val::ByteCode(code.clone()), nodes.clone(), max, false);
-                            data_depent.insert_or_modify(*dst, node.clone());
-                        }
-                    },
-                    Operation::Sub | Add | Operation::Mul | Div | Mod | BitOr | BitAnd | Xor | Shl | Shr  => { // 二元操作
-                        let lnode = data_depent.get(srcs[0]);
-                        let rnode = data_depent.get(srcs[1]);
-                        let ty = &function.local_types[dsts[0]];
-                        // println!("{} {}", srcs[0], srcs[1]);
-                        // let mut res = "".to_string();
-                        // rnode.display(&mut res, &stbgr);
-                        // println!("{}", res);
-                        let (max, is_constant) = binary_operation_max(oper, lnode.max, rnode.max, lnode.is_constant, rnode.is_constant, ty);
-                        let node = Node::new_with_binary_nodes(Val::ByteCode(code.clone()), lnode, rnode, max, is_constant);
-                        data_depent.insert_or_modify(dsts[0], node);
-                    },
-                    Lt | Gt | Le | Ge | Or | And | Eq | Neq => { // 二元操作，返回值为bool，参数类型不确定
-                        let lnode = data_depent.get(srcs[0]);
-                        let rnode = data_depent.get(srcs[1]);
-                        let node = Node::new_with_binary_nodes(Val::ByteCode(code.clone()), lnode, rnode, None, false);
-                        data_depent.insert_or_modify(dsts[0], node);
-                    },
-                    CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 => { // 一元操作
-                        let node = data_depent.get(srcs[0]);
-                        // 源数据的最大值和cast的范围，取最小值
-                        let ty = &function.local_types[dsts[0]];
-                        let ty_max = get_uint_max(ty);
-                        let max = get_min_uint(node.max, ty_max);
-                        let is_constant = node.is_constant;
-                        let node = Node::new_with_node(Val::ByteCode(code.clone()), node, max, is_constant);
-                        data_depent.insert_or_modify(dsts[0], node);
-                    },
-                    Not => {
-                        let node = data_depent.get(srcs[0]);
-                        let node = Node::new_with_node(Val::ByteCode(code.clone()), node, None, false);
-                        data_depent.insert_or_modify(dsts[0], node);
-                    },
-                    Pack(_, _, _) => { // n -> 1
-                        let mut nodes = vec![];
-                        for src in srcs {
-                            let node = data_depent.get(*src);
-                            nodes.push(node);
-                        }
-                        let node = Node::newy_with_nodes(Val::ByteCode(code.clone()), nodes, None, false);
-                        data_depent.insert_or_modify(dsts[0], node);
-                    },
-                    Unpack(_, _, _) => { // 1 -> n
-                        let node = data_depent.get(srcs[0]);
-                        for (i, dst) in dsts.iter().enumerate() {
-                            // 如果结构体来自函数pack操作，可以拿到pack时，每一个成员变量的约束，否则不行
-                            let ty = &function.local_types[*dst];
-                            let max = if node.subnodes.len() == dsts.len() {
-                                if node.subnodes[i].max.is_none() {
-                                    get_uint_max(ty)
-                                } else {
-                                    node.subnodes[i].max
-                                }
-                            } else {
-                                get_uint_max(ty)
-                            };
-                            let node = Node::new_with_node(Val::ByteCode(code.clone()), node.clone(), max, false);
-                            data_depent.insert_or_modify(*dst, node.clone());
+                    }
+                    Load(_, dst, con) => {
+                        let constant = get_uint_constant(con);
+                        let node = Node::new(Val::Const(con.clone()), constant, true);
+                        data_depent.insert_or_modify(*dst, node.clone());
 
-                        }
-                    },
-                    Exists(_, _, _) | FreezeRef | BorrowField(_, _, _, _) | BorrowLoc | // 1 -> 1 TODO
-                        ReadRef | BorrowGlobal(_, _, _) | MoveFrom(_, _, _) => {
-                        let node = data_depent.get(srcs[0]);
-                        let ty = &function.local_types[dsts[0]];
-                        let max = get_uint_max(ty);
-                        let node = Node::new_with_node(Val::ByteCode(code.clone()), node, max, false);
-                        data_depent.insert_or_modify(dsts[0], node);
-                    },
+                    }
                     _ => {
-                        // WriteRef MoveTo 2 -> 0
                         continue;
                     }
                 }
             }
-            Load(_, dst, con) => {
-                let constant = get_uint_constant(con);
-                let node = Node::new(Val::Const(con.clone()), constant, true);
-                data_depent.insert_or_modify(*dst, node.clone());
-
-            }
-            _ => {
-                continue;
-            }
+            self.data_dependency.push(data_depent);
         }
     }
-    data_depent
 }
+
 
 fn is_uint(ty: &Type) -> bool {
     let mut flag = false;

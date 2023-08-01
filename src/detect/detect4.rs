@@ -5,13 +5,14 @@ use std::{collections::BTreeSet, vec};
 use move_model::ty::Type;
 use move_stackless_bytecode::{stackless_control_flow_graph::BlockContent, stackless_bytecode::{Bytecode, AssignKind, Operation}};
 
-use crate::{move_ir::{generate_bytecode::{StacklessBytecodeGenerator, FunctionInfo}, fatloop::get_loops, data_dependency::data_dependency, control_flow_graph::BlockId, packages::Packages}};
+use crate::{move_ir::{generate_bytecode::{StacklessBytecodeGenerator, FunctionInfo}, fatloop::get_loops, control_flow_graph::BlockId, packages::Packages}};
 
 
 pub fn detect_infinite_loop(packages: &Packages, stbgr: &StacklessBytecodeGenerator, idx: usize) -> bool {
     let function = &stbgr.functions[idx];
     let (natural_loops, fat_loops) = get_loops(function);
-    let data_depent = data_dependency(packages, stbgr, idx, 1);
+    // let data_depent = data_dependency(packages, stbgr, idx, 1);
+    let data_depent = &stbgr.data_dependency[idx];
     let cfg = function.cfg.as_ref().unwrap();
     let mut ret_flag = if fat_loops.fat_loops.len() > 0 {true} else {false};
     for (bid, fat_loop) in fat_loops.fat_loops.iter() {

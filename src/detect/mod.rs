@@ -6,3 +6,4 @@ pub mod detect5;
 pub mod detect6;
 pub mod detect7;
 pub mod detect8;
+pub mod detect21;
