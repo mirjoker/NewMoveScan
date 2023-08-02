@@ -4,25 +4,23 @@ use std::io::Write;
 use std::time::Instant;
 use std::{fmt::format, fs, path::PathBuf, str::FromStr, vec};
 
-use MoveScanner::move_ir::packages::Packages;
 use clap::Parser;
 use itertools::Itertools;
 use move_binary_format::{
     access::ModuleAccess, file_format::FunctionDefinitionIndex, CompiledModule,
 };
 use move_bytecode_utils::Modules;
+use num::ToPrimitive;
 use petgraph::dot::{Config, Dot};
 use petgraph::graph::Graph;
+use serde_json::{json, Map, Value};
+use MoveScanner::move_ir::packages::Packages;
 use MoveScanner::{
     cli::parser::*,
     detect::{
-        detect1::detect_unchecked_return,
-        detect2::detect_overflow,
-        detect3::detect_precision_loss,
-        detect4::detect_infinite_loop, 
-        detect5::detect_unused_constants,
-        detect6::detect_unused_private_functions,
-        detect7::detect_unnecessary_type_conversion,
+        detect1::detect_unchecked_return, detect2::detect_overflow, detect3::detect_precision_loss,
+        detect4::detect_infinite_loop, detect5::detect_unused_constants,
+        detect6::detect_unused_private_functions, detect7::detect_unnecessary_type_conversion,
         detect8::detect_unnecessary_bool_judgment,
     },
     move_ir::{
@@ -33,7 +31,6 @@ use MoveScanner::{
     },
     utils::utils::{self, compile_module},
 };
-use serde_json::{json, Value, Map};
 
 fn main() {
     let cli = Cli::parse();
@@ -69,9 +66,11 @@ fn main() {
     }
 
     let mut result = Map::new();
-    for (mname, &stbgr) in packages.get_all_stbgr().iter(){
+    let start = Instant::now();
+    let mut result_modules = Map::new();
+    for (mname, &stbgr) in packages.get_all_stbgr().iter() {
         // 记录每个module的分析市场，函数对应的威胁
-        let mut result2 = Map::new();
+        let mut result_mname = Map::new();
         let start = Instant::now();
         match &cli.command {
             Some(Commands::Printer { printer }) => {
@@ -86,7 +85,10 @@ fn main() {
                         }
                         for (idx, function) in stbgr.functions.iter().enumerate() {
                             let name = stbgr.module.identifier_at(
-                                stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name,
+                                stbgr
+                                    .module
+                                    .function_handle_at(stbgr.module.function_defs[idx].function)
+                                    .name,
                             );
                             let filename = PathBuf::from(format!("{}/{}.dot", dot_dir, name));
                             generate_cfg_in_dot_format(&stbgr.functions[idx], filename, &stbgr);
@@ -133,7 +135,12 @@ fn main() {
                             .iter()
                             .enumerate()
                             .map(|(idx, function)| {
-                                if detect_unchecked_return(function, &stbgr.symbol_pool, idx, stbgr.module) {
+                                if detect_unchecked_return(
+                                    function,
+                                    &stbgr.symbol_pool,
+                                    idx,
+                                    stbgr.module,
+                                ) {
                                     detects[0].push(idx);
                                 }
                             })
@@ -222,7 +229,10 @@ fn main() {
                 }
             }
             None => {
-                println!("============== Handling for {} ==============", mname.clone());
+                println!(
+                    "============== Handling for {} ==============",
+                    mname.clone()
+                );
                 let mut detects: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); 6];
                 for (idx, function) in stbgr.functions.iter().enumerate() {
                     let func_define = stbgr
@@ -268,46 +278,68 @@ fn main() {
                 }
                 format_result(&detects, stbgr.module);
                 println!("==============================================\n");
+
                 // json文件
-                result2.insert("Unused constants num".to_string(), Value::Number(unused_constants.len().into()));
-                result2.insert(
-                    "Unused private functions".to_string(), 
+                let mut result_detects = Map::new();
+                result_detects.insert(
+                    "Unused constants num".to_string(),
+                    Value::Number(unused_constants.len().into()),
+                );
+                result_detects.insert(
+                    "Unused private functions".to_string(),
                     Value::Array(
                         unused_private_function_names
-                        .iter()
-                        .map(|x|
-                            Value::String(x.clone())).collect()
-                        )
+                            .iter()
+                            .map(|x| Value::String(x.clone()))
+                            .collect(),
+                    ),
+                );
+                for (i, detect) in detects.iter().enumerate() {
+                    result_detects.insert(
+                        DETECT_TYPES[i].to_string(),
+                        Value::Array(
+                            detect
+                                .iter()
+                                .map(|&x| Value::String(stbgr.functions[x].name.clone()))
+                                .collect(),
+                        ),
                     );
+                }
+                result_mname.insert("detects".to_string(), Value::Object(result_detects));
+
+                let mut result_functions = Map::new();
                 for (idx, function) in stbgr.functions.iter().enumerate() {
                     let fname = &function.name;
-                    let mut result3 = vec![];
+                    let mut result4 = vec![];
                     for (i, detect) in detects.iter().enumerate() {
                         if detect.contains(&idx) {
-                            result3.push(DETECT_TYPES[i]);
+                            result4.push(DETECT_TYPES[i]);
                         }
                     }
-                    result2.insert(
+                    result_functions.insert(
                         fname.clone(),
-                        Value::Array(
-                            result3
-                            .iter()
-                            .map(|&x|
-                                Value::String(x.into())).collect()
-                            )
-                        );
+                        Value::Array(result4.iter().map(|&x| Value::String(x.into())).collect()),
+                    );
                 }
-                let duration = start.elapsed();
-                result2.insert("Times".to_string(), Value::String(format!("{:?}", duration)));
+                result_mname.insert("functions".to_string(), Value::Object(result_functions));
+                let duration = start.elapsed().as_millis().to_usize().unwrap();
+                result_mname.insert("time(ms)".to_string(), Value::Number(duration.into()));
             }
         }
-        result.insert(mname.clone(), Value::Object(result2));
-
-        if let Some(json_file) = &cli.json_file {
-            let json_output = serde_json::to_string_pretty(&result).unwrap();
-            let mut file = fs::File::create(json_file).expect("Failed to create json file");
-            file.write(json_output.as_bytes()).expect("Failed to write to json file");
-        }
+        result_modules.insert(mname.clone(), Value::Object(result_mname));
+    }
+    let duration = start.elapsed().as_millis().to_usize().unwrap();
+    result.insert("total_time(ms)".to_string(), Value::Number(duration.into()));
+    result.insert(
+        "module_counts".to_string(),
+        Value::Number(packages.get_all_stbgr().len().into()),
+    );
+    result.insert("modules".to_string(), Value::Object(result_modules));
+    if let Some(json_file) = &cli.json_file {
+        let json_output = serde_json::to_string_pretty(&result).unwrap();
+        let mut file = fs::File::create(json_file).expect("Failed to create json file");
+        file.write(json_output.as_bytes())
+            .expect("Failed to write to json file");
     }
 }
 
