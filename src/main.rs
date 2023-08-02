@@ -321,6 +321,7 @@ fn main() {
                         Value::Array(result4.iter().map(|&x| Value::String(x.into())).collect()),
                     );
                 }
+                result_mname.insert("function_counts".to_string(), Value::Number(stbgr.functions.len().into()));
                 result_mname.insert("functions".to_string(), Value::Object(result_functions));
                 let duration = start.elapsed().as_millis().to_usize().unwrap();
                 result_mname.insert("time(ms)".to_string(), Value::Number(duration.into()));
