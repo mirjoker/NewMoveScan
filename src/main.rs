@@ -30,22 +30,26 @@ use MoveScanner::{
         sbir_generator::{Blockchain, MoveScanner as Mc},
     },
     utils::utils::{self, compile_module},
+    utils::result_format::{self, Detection_Results, Module_Details},
 };
 
 fn main() {
+    let mut detection_results = Detection_Results::new();
     let cli = Cli::parse();
     let dir = PathBuf::from(&cli.filedir);
     let mut paths = Vec::new();
     utils::visit_dirs(&dir, &mut paths, false);
 
     let mut cms = Vec::new();
-    let mut failed_modules_count: usize = 0;
+    // let mut failed_modules_count: usize = 0;
     for filename in paths {
         println!("Deserializing {:?}...", filename);
         if let Some(cm) = compile_module(filename) {
+            detection_results.modules_count += 1;
             cms.push(cm);
         } else {
-            failed_modules_count = failed_modules_count + 1;
+            detection_results.failed_modules_count += 1;
+            // failed_modules_count = failed_modules_count + 1;
         }
     }
 
@@ -68,13 +72,14 @@ fn main() {
         packages.insert_stbgr(stbgr);
     }
 
-    let mut result = Map::new();
+    // let mut result = Map::new();
     let start = Instant::now();
-    let mut result_modules = Map::new();
+    // let mut result_modules = Map::new();
     for (mname, &stbgr) in packages.get_all_stbgr().iter() {
         // 记录每个module的分析市场，函数对应的威胁
-        let mut result_mname = Map::new();
+        // let mut result_mname = Map::new();
         let start = Instant::now();
+        detection_results.modules.insert(mname.to_string(), Module_Details::new());
         match &cli.command {
             Some(Commands::Printer { printer }) => {
                 match &printer {
@@ -241,26 +246,46 @@ fn main() {
                     let func_define = stbgr
                         .module
                         .function_def_at(FunctionDefinitionIndex::new(idx as u16));
+                    detection_results.modules.get_mut(mname).unwrap().function_counts += 1;
                     if func_define.is_native() {
+                        detection_results.modules.get_mut(mname).unwrap().native_function_counts += 1;
                         continue;
                     };
 
                     if detect_unchecked_return(function, &stbgr.symbol_pool, idx, stbgr.module) {
+                        detection_results.modules.get_mut(mname).unwrap().
+                        detect_result.get_mut("Unchecked_return").unwrap().
+                        push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                         detects[0].insert(idx);
                     }
                     if detect_overflow(&packages, &stbgr, idx) {
+                        detection_results.modules.get_mut(mname).unwrap().
+                        detect_result.get_mut("Overflow").unwrap().
+                        push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                         detects[1].insert(idx);
                     }
                     if detect_precision_loss(function, &stbgr.symbol_pool) {
+                        detection_results.modules.get_mut(mname).unwrap().
+                        detect_result.get_mut("Precision_Loss").unwrap().
+                        push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                         detects[2].insert(idx);
                     }
                     if detect_infinite_loop(&packages, &stbgr, idx) {
+                        detection_results.modules.get_mut(mname).unwrap().
+                        detect_result.get_mut("Infinite_Loop").unwrap().
+                        push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                         detects[3].insert(idx);
                     }
                     if detect_unnecessary_type_conversion(function, &function.local_types) {
+                        detection_results.modules.get_mut(mname).unwrap().
+                        detect_result.get_mut("Unnecessary_Type_Conversion").unwrap().
+                        push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                         detects[4].insert(idx);
                     }
                     if detect_unnecessary_bool_judgment(function, &function.local_types) {
+                        detection_results.modules.get_mut(mname).unwrap().
+                        detect_result.get_mut("Unnecessary_Bool_Judgment").unwrap().
+                        push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                         detects[5].insert(idx);
                     }
                 }
@@ -283,65 +308,73 @@ fn main() {
                 println!("==============================================\n");
 
                 // json文件
-                let mut result_detects = Map::new();
-                result_detects.insert(
-                    "Unused constants num".to_string(),
-                    Value::Number(unused_constants.len().into()),
-                );
-                result_detects.insert(
-                    "Unused private functions".to_string(),
-                    Value::Array(
-                        unused_private_function_names
-                            .iter()
-                            .map(|x| Value::String(x.clone()))
-                            .collect(),
-                    ),
-                );
-                for (i, detect) in detects.iter().enumerate() {
-                    result_detects.insert(
-                        DETECT_TYPES[i].to_string(),
-                        Value::Array(
-                            detect
-                                .iter()
-                                .map(|&x| Value::String(stbgr.functions[x].name.clone()))
-                                .collect(),
-                        ),
-                    );
-                }
-                result_mname.insert("detects".to_string(), Value::Object(result_detects));
+                detection_results.modules.get_mut(mname).unwrap().detect_result.get_mut("Unused_Constant").unwrap().push(format!("{}", unused_constants.len()));
+                detection_results.modules.get_mut(mname).unwrap().detect_result.get_mut("Unused_Constant").unwrap().push(format!("{:?}", unused_constants));
+                detection_results.modules.get_mut(mname).unwrap().
+                detect_result.get_mut("Unused_Private_Functions").unwrap().append(&mut unused_private_function_names.clone());
+                // let mut result_detects = Map::new();
+                // result_detects.insert(
+                //     "Unused constants num".to_string(),
+                //     Value::Number(unused_constants.len().into()),
+                // );
+                // result_detects.insert(
+                //     "Unused private functions".to_string(),
+                //     Value::Array(
+                //         unused_private_function_names
+                //             .iter()
+                //             .map(|x| Value::String(x.clone()))
+                //             .collect(),
+                //     ),
+                // );
+                // for (i, detect) in detects.iter().enumerate() {
+                //     result_detects.insert(
+                //         DETECT_TYPES[i].to_string(),
+                //         Value::Array(
+                //             detect
+                //                 .iter()
+                //                 .map(|&x| Value::String(stbgr.functions[x].name.clone()))
+                //                 .collect(),
+                //         ),
+                //     );
+                // }
+                // result_mname.insert("detects".to_string(), Value::Object(result_detects));
 
-                let mut result_functions = Map::new();
+                // let mut result_functions = Map::new();
                 for (idx, function) in stbgr.functions.iter().enumerate() {
                     let fname = &function.name;
                     let mut result4 = vec![];
                     for (i, detect) in detects.iter().enumerate() {
                         if detect.contains(&idx) {
-                            result4.push(DETECT_TYPES[i]);
+                            result4.push(DETECT_TYPES[i].to_string());
                         }
                     }
-                    result_functions.insert(
-                        fname.clone(),
-                        Value::Array(result4.iter().map(|&x| Value::String(x.into())).collect()),
-                    );
+                    detection_results.modules.get_mut(mname).unwrap().functions.insert(fname.clone(), result4);
+                    // result_functions.insert(
+                    //     fname.clone(),
+                    //     Value::Array(result4.iter().map(|&x| Value::String(x.into())).collect()),
+                    // );
                 }
-                result_mname.insert("function_counts".to_string(), Value::Number(stbgr.functions.len().into()));
-                result_mname.insert("functions".to_string(), Value::Object(result_functions));
+                detection_results.modules.get_mut(mname).unwrap().function_counts = stbgr.functions.len();
+                // result_mname.insert("function_counts".to_string(), Value::Number(stbgr.functions.len().into()));
+                // result_mname.insert("functions".to_string(), Value::Object(result_functions));
                 let duration = start.elapsed().as_millis().to_usize().unwrap();
-                result_mname.insert("time(ms)".to_string(), Value::Number(duration.into()));
+                detection_results.modules.get_mut(mname).unwrap().time = duration;
+                // result_mname.insert("time(ms)".to_string(), Value::Number(duration.into()));
             }
         }
-        result_modules.insert(mname.clone(), Value::Object(result_mname));
+        // result_modules.insert(mname.clone(), Value::Object(result_mname));
     }
     let duration = start.elapsed().as_millis().to_usize().unwrap();
-    result.insert("total_time(ms)".to_string(), Value::Number(duration.into()));
-    result.insert("failed_module_counts".to_string(), Value::Number(failed_modules_count.into()));
-    result.insert(
-        "module_counts".to_string(),
-        Value::Number(packages.get_all_stbgr().len().into()),
-    );
-    result.insert("modules".to_string(), Value::Object(result_modules));
+    detection_results.total_time = duration;
+    // result.insert("total_time(ms)".to_string(), Value::Number(duration.into()));
+    // result.insert("failed_module_counts".to_string(), Value::Number(failed_modules_count.into()));
+    // result.insert(
+    //     "module_counts".to_string(),
+    //     Value::Number(packages.get_all_stbgr().len().into()),
+    // );
+    // result.insert("modules".to_string(), Value::Object(result_modules));
     if let Some(json_file) = &cli.json_file {
-        let json_output = serde_json::to_string_pretty(&result).unwrap();
+        let json_output = serde_json::to_string(&detection_results).ok().unwrap();
         let mut file = fs::File::create(json_file).expect("Failed to create json file");
         file.write(json_output.as_bytes())
             .expect("Failed to write to json file");
