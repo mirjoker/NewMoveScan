@@ -39,10 +39,13 @@ fn main() {
     utils::visit_dirs(&dir, &mut paths, false);
 
     let mut cms = Vec::new();
+    let mut failed_modules_count: usize = 0;
     for filename in paths {
         println!("Deserializing {:?}...", filename);
         if let Some(cm) = compile_module(filename) {
             cms.push(cm);
+        } else {
+            failed_modules_count = failed_modules_count + 1;
         }
     }
 
@@ -331,6 +334,7 @@ fn main() {
     }
     let duration = start.elapsed().as_millis().to_usize().unwrap();
     result.insert("total_time(ms)".to_string(), Value::Number(duration.into()));
+    result.insert("failed_module_counts".to_string(), Value::Number(failed_modules_count.into()));
     result.insert(
         "module_counts".to_string(),
         Value::Number(packages.get_all_stbgr().len().into()),
