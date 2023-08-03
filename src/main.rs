@@ -308,8 +308,13 @@ fn main() {
                 println!("==============================================\n");
 
                 // json文件
-                detection_results.modules.get_mut(mname).unwrap().detect_result.get_mut("Unused_Constant").unwrap().push(format!("{}", unused_constants.len()));
-                detection_results.modules.get_mut(mname).unwrap().detect_result.get_mut("Unused_Constant").unwrap().push(format!("{:?}", unused_constants));
+                for (_, c) in unused_constants.iter().enumerate() {
+                    detection_results.modules.get_mut(mname).unwrap().
+                    detect_result.get_mut("Unused_Constant").unwrap().
+                    push(format!("{:?}", c));
+                }
+                // detection_results.modules.get_mut(mname).unwrap().detect_result.get_mut("Unused_Constant").unwrap().push(format!("{}", unused_constants.len()));
+                // detection_results.modules.get_mut(mname).unwrap().detect_result.get_mut("Unused_Constant").unwrap().push(format!("{:?}", unused_constants));
                 detection_results.modules.get_mut(mname).unwrap().
                 detect_result.get_mut("Unused_Private_Functions").unwrap().append(&mut unused_private_function_names.clone());
                 // let mut result_detects = Map::new();
@@ -357,14 +362,16 @@ fn main() {
                 detection_results.modules.get_mut(mname).unwrap().function_counts = stbgr.functions.len();
                 // result_mname.insert("function_counts".to_string(), Value::Number(stbgr.functions.len().into()));
                 // result_mname.insert("functions".to_string(), Value::Object(result_functions));
-                let duration = start.elapsed().as_millis().to_usize().unwrap();
+                // let duration = start.elapsed();
+                let duration = start.elapsed().as_micros().to_usize().unwrap();
                 detection_results.modules.get_mut(mname).unwrap().time = duration;
                 // result_mname.insert("time(ms)".to_string(), Value::Number(duration.into()));
             }
         }
         // result_modules.insert(mname.clone(), Value::Object(result_mname));
     }
-    let duration = start.elapsed().as_millis().to_usize().unwrap();
+    // let duration = start.elapsed();
+    let duration = start.elapsed().as_micros().to_usize().unwrap();
     detection_results.total_time = duration;
     // result.insert("total_time(ms)".to_string(), Value::Number(duration.into()));
     // result.insert("failed_module_counts".to_string(), Value::Number(failed_modules_count.into()));
