@@ -10,7 +10,7 @@ pub struct Cli {
     #[clap(short = 'f', long, help = "The project under this dir will be analyzed")]
     pub filedir: String,
 
-    #[clap(short = 'j', long, help = "Write the result in json")]
+    #[clap(short = 'j', long, help = "Write the result in json", default_value=Some("result.json"))]
     pub json_file: Option<String>,
 }
 
