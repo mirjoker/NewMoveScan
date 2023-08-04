@@ -26,7 +26,7 @@ else
 fi
 
 if [ ! -x $MOVESCANNER_PATH_TARGET ]; then
-    LOG_ERROR "please check if 'cargo build --release' success."
+    LOG_ERROR "No executable found in $MOVESCANNER_BIN."
 else
     LOG_INFO "please add the following to your shell configuration file(.bashrc): \n\t export MOVESCANNER_ROOT=\"\$HOME/.MoveScanner\" \n\t export PATH=\"\$MOVESCANNER_ROOT/bin:\$PATH\""
     LOG_SUCCESS "Start a new terminal session, Try 'MoveScanner -h', enjoy!"
