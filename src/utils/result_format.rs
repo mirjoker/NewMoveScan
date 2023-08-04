@@ -59,7 +59,7 @@ pub struct Module_Details {
 impl Module_Details {
     pub fn new() -> Self {
         let mut detect_result = BTreeMap::new();
-        detect_result.insert("Unchecked_return".to_string(), vec![]);
+        detect_result.insert("Unchecked_Return".to_string(), vec![]);
         detect_result.insert("Overflow".to_string(), vec![]);
         detect_result.insert("Precision_Loss".to_string(), vec![]);
         detect_result.insert("Infinite_Loop".to_string(), vec![]);

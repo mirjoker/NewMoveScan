@@ -1,7 +1,8 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, collections::BTreeSet, fs, io::Write};
 use itertools::Itertools;
 use move_binary_format::{file_format::FunctionDefinitionIndex, access::ModuleAccess, CompiledModule};
-use crate::{utils::utils::{self, compile_module}, move_ir::{generate_bytecode::StacklessBytecodeGenerator, packages::Packages}, 
+use num::ToPrimitive;
+use crate::{utils::{utils::{self, compile_module}, result_format::{Detection_Results, Module_Details}}, move_ir::{generate_bytecode::StacklessBytecodeGenerator, packages::Packages}, 
 detect::{detect1::detect_unchecked_return, detect2::detect_overflow, detect3::detect_precision_loss, detect4::detect_infinite_loop, 
     detect7::detect_unnecessary_type_conversion, detect8::detect_unnecessary_bool_judgment, detect5::detect_unused_constants, detect6::detect_unused_private_functions}};
 use std::time::{Duration, Instant};
@@ -9,66 +10,130 @@ use std::time::{Duration, Instant};
 #[test]
 fn test_for_online_bytecodes() {
     let start = Instant::now();
-    let dir = PathBuf::from("/home/yule/Movebit/aptos_onchain_bytecode");
+    let mut detection_results = Detection_Results::new();
+    let dir = PathBuf::from("/home/yww/MoveScannerTest/src/sui_onchain_bytecode");
     let mut paths = Vec::new();
     utils::visit_dirs(&dir, &mut paths, false);
+
     let mut bytecode_cnt = 0;
     let mut bytecode_fail_to_deserialize_cnt = 0;
     let mut func_cnt = 0;
     let mut native_func_cnt = 0;
     let mut defects_cnt = vec![0,0,0,0,0,0,0,0];
-    let defects_name = vec!["unckecked return","overflow","precision loss","infinite loop",
-    "unnecessary type conversion","unnecessary bool judgment","unused constants","unused private functions"];
+    let defects_name = vec!["Unchecked_return","Overflow","Precision_Loss","Infinite_Loop",
+    "Unnecessary_Type_Conversion","Unnecessary_Bool_Judgment","Unused_Constant","Unused_Private_Functions"];
     for filename in paths.iter() {
         bytecode_cnt += 1;
         let cm = compile_module(filename.to_path_buf());
         if(cm.is_none()) {
             bytecode_fail_to_deserialize_cnt += 1;
+            detection_results.failed_modules_count += 1;
             continue;
+        } else {
+            detection_results.modules_count += 1;
         }
         let cm = cm.unwrap();
+        let mut stbgrs = Vec::new();
         let mut stbgr = StacklessBytecodeGenerator::new(&cm);
         stbgr.generate_function();
         stbgr.get_control_flow_graph();
         stbgr.build_call_graph();
+        stbgr.get_data_dependency(&mut stbgrs);
+
         let mut packages = Packages::new();
         packages.insert_stbgr(&stbgr);
+
         for (_, &stbgr) in packages.get_all_stbgr().iter(){
+            let mname = filename.file_name().unwrap().to_str().unwrap();
+            let start = Instant::now();
+            detection_results.modules.insert(mname.to_string(), Module_Details::new());
+            let mut detects: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); 6];
             for (idx, function) in stbgr.functions.iter().enumerate() {
                 func_cnt += 1;
+                detection_results.modules.get_mut(mname).unwrap().function_counts += 1;
                 let func_define = stbgr
                     .module
                     .function_def_at(FunctionDefinitionIndex::new(idx as u16));
                 if func_define.is_native() {
                     native_func_cnt += 1;
+                    detection_results.modules.get_mut(mname).unwrap().native_function_counts += 1;
                     continue;
 
                 };
 
                 if detect_unchecked_return(function, &stbgr.symbol_pool, idx, stbgr.module) {
+                    detection_results.modules.get_mut(mname).unwrap().
+                    detect_result.get_mut("Unchecked_Return").unwrap().
+                    push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                     defects_cnt[0] += 1;
+                    detects[0].insert(idx);
                 }
                 if detect_overflow(&packages, &stbgr, idx) {
+                    detection_results.modules.get_mut(mname).unwrap().
+                    detect_result.get_mut("Overflow").unwrap().
+                    push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                     defects_cnt[1] += 1;
+                    detects[1].insert(idx);
                 }
                 if detect_precision_loss(function, &stbgr.symbol_pool) {
+                    detection_results.modules.get_mut(mname).unwrap().
+                    detect_result.get_mut("Precision_Loss").unwrap().
+                    push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                     defects_cnt[2] += 1;
+                    detects[2].insert(idx);
                 }
                 if detect_infinite_loop(&packages, &stbgr, idx) {
+                    detection_results.modules.get_mut(mname).unwrap().
+                    detect_result.get_mut("Infinite_Loop").unwrap().
+                    push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                     defects_cnt[3] += 1;
+                    detects[3].insert(idx);
                 }
                 if detect_unnecessary_type_conversion(function, &function.local_types) {
+                    detection_results.modules.get_mut(mname).unwrap().
+                    detect_result.get_mut("Unnecessary_Type_Conversion").unwrap().
+                    push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                     defects_cnt[4] += 1;
+                    detects[4].insert(idx);
                 }
                 if detect_unnecessary_bool_judgment(function, &function.local_types) {
+                    detection_results.modules.get_mut(mname).unwrap().
+                    detect_result.get_mut("Unnecessary_Bool_Judgment").unwrap().
+                    push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                     defects_cnt[5] += 1;
+                    detects[5].insert(idx);
                 }
             }
             let unused_constants = detect_unused_constants(&stbgr);
             defects_cnt[6] += unused_constants.len();
+            for (_, c) in unused_constants.iter().enumerate() {
+                detection_results.modules.get_mut(mname).unwrap().
+                detect_result.get_mut("Unused_Constant").unwrap().
+                push(format!("{:?}", c));
+            }
 
             let unused_private_functions = detect_unused_private_functions(&stbgr);
+            let unused_private_function_names = unused_private_functions
+                .iter()
+                .map(|func| func.symbol().display(&stbgr.symbol_pool).to_string())
+                .collect_vec();
             defects_cnt[7] += unused_private_functions.len();
+            detection_results.modules.get_mut(mname).unwrap().
+            detect_result.get_mut("Unused_Private_Functions").unwrap().append(&mut unused_private_function_names.clone());
+
+            for (idx, function) in stbgr.functions.iter().enumerate() {
+                let fname = &function.name;
+                let mut result4 = vec![];
+                for (i, detect) in detects.iter().enumerate() {
+                    if detect.contains(&idx) {
+                        result4.push(defects_name[i].to_string());
+                    }
+                }
+                detection_results.modules.get_mut(mname).unwrap().functions.insert(fname.clone(), result4);
+            }
+            detection_results.modules.get_mut(mname).unwrap().function_counts = stbgr.functions.len();
+            let duration = start.elapsed().as_micros().to_usize().unwrap();
+            detection_results.modules.get_mut(mname).unwrap().time = duration;
         }
     }
     println!("bytecode_cnt:{}", bytecode_cnt);
@@ -85,4 +150,13 @@ fn test_for_online_bytecodes() {
     println!("total:{}", sum);
     let duration = start.elapsed();
     println!("Time elapsed in test_for_online_bytecodes() is: {:?}", duration);
+    let duration = duration.as_micros().to_usize().unwrap();
+    detection_results.total_time = duration;
+
+    println!("counts:{}",detection_results.modules.len());
+    let json_output = serde_json::to_string(&detection_results).ok().unwrap();
+    let mut file = fs::File::create("sui_chaincode_result1.json").expect("Failed to create json file");
+    file.write(json_output.as_bytes())
+    .expect("Failed to write to json file");
+
 }
