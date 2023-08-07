@@ -11,7 +11,7 @@ MoveScanner is a bytecode based move static analysis tool written in rust.
     ./build
     ```
 
-2. Please add the following to your shell configuration file(e.g. ~/.bashrc, ~/.zshrc):
+2. Please add the following to your shell configuration file(e.g. `~/.bashrc`, `~/.zshrc`):
 
     ```
     export MOVESCANNER_ROOT="$HOME/.MoveScanner" 

@@ -39,8 +39,9 @@ if [ ! -x $MOVESCANNER_PATH_TARGET ]; then
     LOG_ERROR "No executable found in $MOVESCANNER_BIN."
 else
 
-    TestIfConfiged $HOME/.zshrc
     TestIfConfiged $HOME/.bashrc
+    TestIfConfiged $HOME/.zshrc
+    TestIfConfiged $HOME/.config/fish/config.fish
     TestIfConfiged $HOME/.bash_profile
     TestIfConfiged $HOME/.profile
     TestIfConfiged /etc/bashrc
