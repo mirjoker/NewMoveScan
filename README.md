@@ -4,20 +4,27 @@ MoveScanner is a bytecode based move static analysis tool written in rust.
 
 ## QuickStart
 
-1. run `build.sh`
+1. Run `build.sh`:
 
     ```
     cd MoveScanner
     ./build
     ```
 
-2. please add the following to your shell configuration file(e.g. .bashrc, .zshrc)
+2. Please add the following to your shell configuration file(e.g. ~/.bashrc, ~/.zshrc):
 
     ```
     export MOVESCANNER_ROOT="$HOME/.MoveScanner" 
     export PATH="$MOVESCANNER_ROOT/bin:$PATH"
     ```
-3. Start a new terminal session, enjoy!
+
+3. If you want to update MoveScanner:
+
+    ```
+    git pull
+    ./build
+    ```
+4. Start a new terminal session, enjoy!
 
 ## Usage
 ```
