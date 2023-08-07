@@ -79,6 +79,7 @@ fn main() {
         let start = Instant::now();
         // 向detection_results.modules插入该module的检测信息
         detection_results.modules.insert(mname.to_string(), Module_Details::new());
+        detection_results.modules.get_mut(mname).unwrap().constant_counts = stbgr.module.constant_pool.len();
         
         // println!(
         //     "============== Handling for {} ==============",
@@ -156,6 +157,9 @@ fn main() {
                 if detect.contains(&idx) {
                     tmp.push(Defects::get_defect_neme(i));
                 }
+            }
+            if unused_private_function_names.contains(fname) {
+                tmp.push(Defects::get_defect_neme(7));
             }
             detection_results.modules.get_mut(mname).unwrap().functions.insert(fname.clone(), tmp);
         }

@@ -2,7 +2,7 @@ use std::{path::PathBuf, collections::BTreeSet, fs, io::Write};
 use itertools::Itertools;
 use move_binary_format::{file_format::FunctionDefinitionIndex, access::ModuleAccess, CompiledModule};
 use num::ToPrimitive;
-use crate::{utils::{utils::{self, compile_module}, result_format::{Detection_Results, Module_Details}}, move_ir::{generate_bytecode::StacklessBytecodeGenerator, packages::Packages}, 
+use crate::{utils::{utils::{self, compile_module}, result_format::{Detection_Results, Module_Details}, defect_enum::Defects,}, move_ir::{generate_bytecode::StacklessBytecodeGenerator, packages::Packages}, 
 detect::{detect1::detect_unchecked_return, detect2::detect_overflow, detect3::detect_precision_loss, detect4::detect_infinite_loop, 
     detect7::detect_unnecessary_type_conversion, detect8::detect_unnecessary_bool_judgment, detect5::detect_unused_constants, detect6::detect_unused_private_functions}};
 use std::time::{Duration, Instant};
@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 fn test_for_online_bytecodes() {
     let start = Instant::now();
     let mut detection_results = Detection_Results::new();
-    let dir = PathBuf::from("/home/yww/MoveScannerTest/src/sui_onchain_bytecode");
+    let dir = PathBuf::from("/home/yww/MoveScannerTest/src/aptos_onchain_bytecode");
     let mut paths = Vec::new();
     utils::visit_dirs(&dir, &mut paths, false);
 
@@ -19,15 +19,17 @@ fn test_for_online_bytecodes() {
     let mut bytecode_fail_to_deserialize_cnt = 0;
     let mut func_cnt = 0;
     let mut native_func_cnt = 0;
+    let mut constant_cnt = 0;
     let mut defects_cnt = vec![0,0,0,0,0,0,0,0];
-    let defects_name = vec!["Unchecked_return","Overflow","Precision_Loss","Infinite_Loop",
-    "Unnecessary_Type_Conversion","Unnecessary_Bool_Judgment","Unused_Constant","Unused_Private_Functions"];
+    // let defects_name = vec!["Unchecked_return","Overflow","Precision_Loss","Infinite_Loop",
+    // "Unnecessary_Type_Conversion","Unnecessary_Bool_Judgment","Unused_Constant","Unused_Private_Functions"];
     for filename in paths.iter() {
         bytecode_cnt += 1;
         let cm = compile_module(filename.to_path_buf());
         if(cm.is_none()) {
             bytecode_fail_to_deserialize_cnt += 1;
             detection_results.failed_modules_count += 1;
+            println!("Fail to deserialize {:?} !!!", filename);
             continue;
         } else {
             detection_results.modules_count += 1;
@@ -47,6 +49,8 @@ fn test_for_online_bytecodes() {
             let mname = filename.file_name().unwrap().to_str().unwrap();
             let start = Instant::now();
             detection_results.modules.insert(mname.to_string(), Module_Details::new());
+            detection_results.modules.get_mut(mname).unwrap().constant_counts = stbgr.module.constant_pool.len();
+            constant_cnt += stbgr.module.constant_pool.len();
             let mut detects: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); 6];
             for (idx, function) in stbgr.functions.iter().enumerate() {
                 func_cnt += 1;
@@ -111,7 +115,6 @@ fn test_for_online_bytecodes() {
                 detect_result.get_mut("Unused_Constant").unwrap().
                 push(format!("{:?}", c));
             }
-
             let unused_private_functions = detect_unused_private_functions(&stbgr);
             let unused_private_function_names = unused_private_functions
                 .iter()
@@ -121,15 +124,19 @@ fn test_for_online_bytecodes() {
             detection_results.modules.get_mut(mname).unwrap().
             detect_result.get_mut("Unused_Private_Functions").unwrap().append(&mut unused_private_function_names.clone());
 
+
             for (idx, function) in stbgr.functions.iter().enumerate() {
                 let fname = &function.name;
-                let mut result4 = vec![];
+                let mut tmp = vec![];
                 for (i, detect) in detects.iter().enumerate() {
                     if detect.contains(&idx) {
-                        result4.push(defects_name[i].to_string());
+                        tmp.push(Defects::get_defect_neme(i));
                     }
                 }
-                detection_results.modules.get_mut(mname).unwrap().functions.insert(fname.clone(), result4);
+                if unused_private_function_names.contains(fname) {
+                    tmp.push(Defects::get_defect_neme(7))
+                }
+                detection_results.modules.get_mut(mname).unwrap().functions.insert(fname.clone(), tmp);
             }
             detection_results.modules.get_mut(mname).unwrap().function_counts = stbgr.functions.len();
             let duration = start.elapsed().as_micros().to_usize().unwrap();
@@ -140,10 +147,11 @@ fn test_for_online_bytecodes() {
     println!("bytecode_fail_to_deserialize_cnt:{}", bytecode_fail_to_deserialize_cnt);
     println!("func_cnt:{}", func_cnt);
     println!("native_func_cnt:{}", native_func_cnt);
+    println!("constant_cnt:{}", constant_cnt);
     let mut i = 0;
     let mut sum = 0;
     while i < 8 {
-        println!("{}:{}",defects_name[i],defects_cnt[i]);
+        println!("{}:{}",Defects::get_defect_neme(i),defects_cnt[i]);
         sum += defects_cnt[i];
         i += 1;
     }
@@ -153,9 +161,8 @@ fn test_for_online_bytecodes() {
     let duration = duration.as_micros().to_usize().unwrap();
     detection_results.total_time = duration;
 
-    println!("counts:{}",detection_results.modules.len());
     let json_output = serde_json::to_string(&detection_results).ok().unwrap();
-    let mut file = fs::File::create("sui_chaincode_result1.json").expect("Failed to create json file");
+    let mut file = fs::File::create("aptos_chaincode_result.json").expect("Failed to create json file");
     file.write(json_output.as_bytes())
     .expect("Failed to write to json file");
 

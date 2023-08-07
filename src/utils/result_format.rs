@@ -16,6 +16,7 @@ pub struct Module_Details {
     pub time : usize,
     pub function_counts : usize,
     pub native_function_counts : usize,
+    pub constant_counts : usize,
     pub detect_result : BTreeMap<String, Vec<String>>,
     pub functions : BTreeMap<String, Vec<String>>
 }
@@ -72,6 +73,7 @@ impl Module_Details {
             time: 0, 
             function_counts: 0, 
             native_function_counts: 0,
+            constant_counts : 0,
             detect_result: detect_result, 
             functions: functions
         }
