@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 fn test_for_online_bytecodes() {
     let start = Instant::now();
     let mut detection_results = Detection_Results::new();
-    let dir = PathBuf::from("/home/yww/MoveScannerTest/src/aptos_onchain_bytecode");
+    let dir = PathBuf::from("/home/yww/MoveScannerTest/src/sui_onchain_bytecode");
     let mut paths = Vec::new();
     utils::visit_dirs(&dir, &mut paths, false);
 
@@ -54,7 +54,6 @@ fn test_for_online_bytecodes() {
             let mut detects: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); 6];
             for (idx, function) in stbgr.functions.iter().enumerate() {
                 func_cnt += 1;
-                detection_results.modules.get_mut(mname).unwrap().function_counts += 1;
                 let func_define = stbgr
                     .module
                     .function_def_at(FunctionDefinitionIndex::new(idx as u16));
@@ -162,7 +161,7 @@ fn test_for_online_bytecodes() {
     detection_results.total_time = duration;
 
     let json_output = serde_json::to_string(&detection_results).ok().unwrap();
-    let mut file = fs::File::create("aptos_chaincode_result.json").expect("Failed to create json file");
+    let mut file = fs::File::create("sui_chaincode_result.json").expect("Failed to create json file");
     file.write(json_output.as_bytes())
     .expect("Failed to write to json file");
 

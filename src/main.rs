@@ -91,7 +91,6 @@ fn main() {
             let func_define = stbgr
                 .module
                 .function_def_at(FunctionDefinitionIndex::new(idx as u16));
-            detection_results.modules.get_mut(mname).unwrap().function_counts += 1;
             if func_define.is_native() {
                 detection_results.modules.get_mut(mname).unwrap().native_function_counts += 1;
                 continue;
