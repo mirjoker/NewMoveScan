@@ -8,13 +8,13 @@ use move_model::ty::{PrimitiveType, Type};
 use move_stackless_bytecode::stackless_bytecode::{Bytecode, Operation};
 
 pub fn detect_overflow(
-    packages: &Packages,
+    _packages: &Packages,
     stbgr: &StacklessBytecodeGenerator,
     idx: usize,
 ) -> bool {
     let function = &stbgr.functions[idx];
     let mut ret_flag = false;
-    let local_types = &function.local_types;
+    let _local_types = &function.local_types;
     let dd = &stbgr.data_dependency[idx];
     for (_, bytecode) in function.code.iter().enumerate() {
         match &bytecode {

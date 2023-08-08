@@ -14,7 +14,7 @@ use move_core_types::language_storage::{self, CORE_CODE_ADDRESS};
 use move_model::{
     ast::{ModuleName, QualifiedSymbol, TempIndex},
     model::{FunId, FunctionData, Loc, ModuleData, ModuleId, QualifiedId, StructId},
-    symbol::{SymbolPool, Symbol},
+    symbol::SymbolPool,
     ty::{PrimitiveType, Type},
 };
 use move_stackless_bytecode::{

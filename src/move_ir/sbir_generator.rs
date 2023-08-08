@@ -143,15 +143,15 @@ impl MoveScanner {
             let module_name = func_env.module_env.get_name().clone();
             let func_name = func_env.get_name();
             // 范型参数数量
-            let tparams_count_all = func_env.get_type_parameter_count();
-            let tparams_count_defined = func_env.get_type_parameter_count();
+            let _tparams_count_all = func_env.get_type_parameter_count();
+            let _tparams_count_defined = func_env.get_type_parameter_count();
             // 参数及类型
             let mut params: Vec<Type> = vec![];
             let params_count = func_env.get_parameter_count();
             for idx in 0..params_count {
                 let ty = func_env.get_local_type(idx);
                 params.push(ty);
-                let local_name = if target.has_local_user_name(idx) {
+                let _local_name = if target.has_local_user_name(idx) {
                     Some(target.get_local_name(idx))
                 } else {
                     None
@@ -167,8 +167,8 @@ impl MoveScanner {
             // 所有左值类型
             let local_count = func_env.get_local_count();
             for idx in params_count..local_count {
-                let ty = func_env.get_local_type(idx);
-                let local_name = if target.has_local_user_name(idx) {
+                let _ty = func_env.get_local_type(idx);
+                let _local_name = if target.has_local_user_name(idx) {
                     Some(target.get_local_name(idx))
                 } else {
                     None

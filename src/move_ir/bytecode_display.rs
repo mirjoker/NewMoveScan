@@ -36,14 +36,14 @@ pub fn oper_display<'env>(
 }
 
 /// Creates a format object for a borrow node in context of a function target.
-pub fn BorrowNode_display<'env>(
+pub fn borrow_node_display<'env>(
     node: &'env BorrowNode,
     stbgr: &'env StacklessBytecodeGenerator<'env>,
 ) -> BorrowNodeDisplay<'env> {
     BorrowNodeDisplay { node, stbgr }
 }
 
-pub fn BorrowEdge_display<'env>(
+pub fn borrow_edge_display<'env>(
     edge: &'env BorrowEdge,
     stbgr: &'env StacklessBytecodeGenerator<'env>,
 ) -> BorrowEdgeDisplay<'env> {
@@ -113,12 +113,12 @@ impl<'env> fmt::Display for BytecodeDisplay<'env> {
             Nop(_) => {
                 write!(f, "nop")?;
             }
-            SaveMem(_, label, qid) => {
+            SaveMem(_, _label, _qid) => {
                 // TODO
                 // let env = self.func_target.global_env();
                 // write!(f, "@{} := save_mem({})", label.as_usize(), env.display(qid))?;
             }
-            SaveSpecVar(_, label, qid) => {
+            SaveSpecVar(_, _label, _qid) => {
                 // TODO skip it
                 // let env = self.func_target.global_env();
                 // let module_env = env.get_module(qid.module_id);
@@ -131,7 +131,7 @@ impl<'env> fmt::Display for BytecodeDisplay<'env> {
                 //     spec_var.name.display(env.symbol_pool())
                 // )?;
             }
-            Prop(_, kind, exp) => {
+            Prop(_, _kind, _exp) => {
                 // TODO
                 // let exp_display = exp.display(self.func_target.func_env.module_env.env);
                 // match kind {
@@ -291,7 +291,7 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             UnpackRefDeep => {
                 write!(f, "unpack_ref_deep")?;
             }
-            WriteBack(node, edge) => {
+            WriteBack(_node, _edge) => {
                 // TODO
                 // write!(
                 //     f,
@@ -300,7 +300,7 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                 //     edge.display(self.func_target.global_env())
                 // )?;
             }
-            IsParent(node, edge) => {
+            IsParent(_node, _edge) => {
                 // TODO
                 // write!(
                 //     f,
@@ -353,7 +353,7 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             Neq => write!(f, "!=")?,
 
             // Debugging
-            TraceLocal(l) => {
+            TraceLocal(_l) => {
                 // TODO
                 // let name = self.func_target.get_local_name(*l);
                 // write!(
@@ -364,7 +364,7 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             }
             TraceAbort => write!(f, "trace_abort")?,
             TraceReturn(r) => write!(f, "trace_return[{}]", r)?,
-            TraceExp(kind, node_id) => {
+            TraceExp(_kind, _node_id) => {
                 // TODO
                 // let loc = self.func_target.global_env().get_node_loc(*node_id);
                 // write!(
@@ -412,6 +412,7 @@ impl<'env> OperationDisplay<'env> {
 }
 
 /// A display object for a borrow node.
+#[allow(unused)]
 pub struct BorrowNodeDisplay<'env> {
     node: &'env BorrowNode,
     stbgr: &'env StacklessBytecodeGenerator<'env>,
@@ -421,7 +422,7 @@ impl<'env> fmt::Display for BorrowNodeDisplay<'env> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use BorrowNode::*;
         match self.node {
-            GlobalRoot(s) => {
+            GlobalRoot(_s) => {
                 // TODO
                 // let ty = Type::Struct(s.module_id, s.id, s.inst.to_owned());
                 // let tctx = TypeDisplayContext::WithEnv {
@@ -444,13 +445,14 @@ impl<'env> fmt::Display for BorrowNodeDisplay<'env> {
     }
 }
 
+#[allow(unused)]
 pub struct BorrowEdgeDisplay<'a> {
     stbgr: &'a StacklessBytecodeGenerator<'a>,
     edge: &'a BorrowEdge,
 }
 
 impl<'a> std::fmt::Display for BorrowEdgeDisplay<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // use BorrowEdge::*;
         // TODO
         // let tctx = TypeDisplayContext::WithEnv {

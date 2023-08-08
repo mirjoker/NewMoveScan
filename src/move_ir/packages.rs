@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use move_binary_format::CompiledModule;
-use move_model::{ast::ModuleName, model::FunId};
+
+use move_model::{model::FunId};
 
 use super::generate_bytecode::{StacklessBytecodeGenerator, FunctionInfo};
 

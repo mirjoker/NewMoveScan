@@ -1,20 +1,18 @@
-use std::borrow::BorrowMut;
-use std::collections::{BTreeMap, BTreeSet};
+#![allow(non_snake_case)]
+
+use std::collections::BTreeSet;
 use std::io::Write;
 use std::time::Instant;
-use std::{fmt::format, fs, path::PathBuf, str::FromStr, vec};
+use std::{fs, path::PathBuf, vec};
 
 use clap::Parser;
 use itertools::Itertools;
 use move_binary_format::{
-    access::ModuleAccess, file_format::FunctionDefinitionIndex, CompiledModule,
+    access::ModuleAccess, file_format::FunctionDefinitionIndex, 
 };
-use move_bytecode_utils::Modules;
-use num::ToPrimitive;
-use petgraph::dot::{Config, Dot};
-use petgraph::graph::Graph;
-use serde_json::{json, Map, Value};
+
 use MoveScanner::move_ir::packages::Packages;
+#[allow(non_snake_case)]
 use MoveScanner::{
     cli::parser::*,
     detect::{
@@ -23,20 +21,15 @@ use MoveScanner::{
         detect6::detect_unused_private_functions, detect7::detect_unnecessary_type_conversion,
         detect8::detect_unnecessary_bool_judgment,
     },
-    move_ir::{
-        bytecode_display::display,
-        control_flow_graph::generate_cfg_in_dot_format,
-        generate_bytecode::StacklessBytecodeGenerator,
-        sbir_generator::{Blockchain, MoveScanner as Mc},
-    },
+    move_ir::generate_bytecode::StacklessBytecodeGenerator,
     utils::utils::{self, compile_module},
-    utils::result_format::{self, Detection_Results, Module_Details},
+    utils::result_format::{ DetectionResults, ModuleDetails},
     utils::defect_enum::Defects,
 };
-
+use num::ToPrimitive;
 fn main() {
 
-    let mut detection_results = Detection_Results::new();
+    let mut detection_results = DetectionResults::new();
 
     // 命令行参数解析
     let cli = Cli::parse();
@@ -78,7 +71,7 @@ fn main() {
     for (mname, &stbgr) in packages.get_all_stbgr().iter() {
         let start = Instant::now();
         // 向detection_results.modules插入该module的检测信息
-        detection_results.modules.insert(mname.to_string(), Module_Details::new());
+        detection_results.modules.insert(mname.to_string(), ModuleDetails::new());
         detection_results.modules.get_mut(mname).unwrap().constant_counts = stbgr.module.constant_pool.len();
         
         // println!(
@@ -98,7 +91,7 @@ fn main() {
 
             if detect_unchecked_return(function, &stbgr.symbol_pool, idx, stbgr.module) {
                 detection_results.modules.get_mut(mname).unwrap().
-                detect_result.get_mut("Unchecked_Return").unwrap().
+                detect_result.get_mut("UncheckedReturn").unwrap().
                 push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                 detects[0].insert(idx);
             }
@@ -110,25 +103,25 @@ fn main() {
             }
             if detect_precision_loss(function, &stbgr.symbol_pool) {
                 detection_results.modules.get_mut(mname).unwrap().
-                detect_result.get_mut("Precision_Loss").unwrap().
+                detect_result.get_mut("PrecisionLoss").unwrap().
                 push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                 detects[2].insert(idx);
             }
             if detect_infinite_loop(&packages, &stbgr, idx) {
                 detection_results.modules.get_mut(mname).unwrap().
-                detect_result.get_mut("Infinite_Loop").unwrap().
+                detect_result.get_mut("InfiniteLoop").unwrap().
                 push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                 detects[3].insert(idx);
             }
             if detect_unnecessary_type_conversion(function, &function.local_types) {
                 detection_results.modules.get_mut(mname).unwrap().
-                detect_result.get_mut("Unnecessary_Type_Conversion").unwrap().
+                detect_result.get_mut("UnnecessaryTypeConversion").unwrap().
                 push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                 detects[4].insert(idx);
             }
             if detect_unnecessary_bool_judgment(function, &function.local_types) {
                 detection_results.modules.get_mut(mname).unwrap().
-                detect_result.get_mut("Unnecessary_Bool_Judgment").unwrap().
+                detect_result.get_mut("UnnecessaryBoolJudgment").unwrap().
                 push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                 detects[5].insert(idx);
             }
@@ -143,11 +136,11 @@ fn main() {
         // json文件
         for (_, c) in unused_constants.iter().enumerate() {
             detection_results.modules.get_mut(mname).unwrap().
-            detect_result.get_mut("Unused_Constant").unwrap().
+            detect_result.get_mut("UnusedConstant").unwrap().
             push(format!("{:?}", c));
         }
         detection_results.modules.get_mut(mname).unwrap().
-        detect_result.get_mut("Unused_Private_Functions").unwrap().append(&mut unused_private_function_names.clone());
+        detect_result.get_mut("UnusedPrivateFunctions").unwrap().append(&mut unused_private_function_names.clone());
         
         for (idx, function) in stbgr.functions.iter().enumerate() {
             let fname = &function.name;

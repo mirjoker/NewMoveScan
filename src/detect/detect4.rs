@@ -7,15 +7,15 @@ use move_stackless_bytecode::{stackless_control_flow_graph::BlockContent, stackl
 
 use crate::{move_ir::{generate_bytecode::{StacklessBytecodeGenerator, FunctionInfo}, fatloop::get_loops, control_flow_graph::BlockId, packages::Packages}};
 
-
-pub fn detect_infinite_loop(packages: &Packages, stbgr: &StacklessBytecodeGenerator, idx: usize) -> bool {
+#[allow(unused)]
+pub fn detect_infinite_loop(_packages: &Packages, stbgr: &StacklessBytecodeGenerator, idx: usize) -> bool {
     let function = &stbgr.functions[idx];
-    let (natural_loops, fat_loops) = get_loops(function);
+    let (_natural_loops, fat_loops) = get_loops(function);
     // let data_depent = data_dependency(packages, stbgr, idx, 1);
     let data_depent = &stbgr.data_dependency[idx];
     let cfg = function.cfg.as_ref().unwrap();
     let mut ret_flag = if fat_loops.fat_loops.len() > 0 {true} else {false};
-    for (bid, fat_loop) in fat_loops.fat_loops.iter() {
+    for (_bid, fat_loop) in fat_loops.fat_loops.iter() {
         let mut branchs: BTreeSet<BlockId> = BTreeSet::new();
         let mut unions: BTreeSet<BlockId> = BTreeSet::new();
         // 循环体中所有的block
@@ -40,7 +40,7 @@ pub fn detect_infinite_loop(packages: &Packages, stbgr: &StacklessBytecodeGenera
                 if branchs.contains(bid) {
                     let (mut l, mut u): (u16, u16) = (0, 0);
                     if let BlockContent::Basic { lower, upper } = content {
-                        l = *lower;
+                        l = *lower; 
                         u = *upper;
                     }
                     // 条件分支语句
@@ -75,18 +75,18 @@ fn changed_loop_condition(function: &FunctionInfo, content: &BlockContent, condi
     for i in (l+offset)..u {
         let instr = &function.code[i as usize];
         match instr {
-            Bytecode::Assign(_, dst, src, assginkind) => {
+            Bytecode::Assign(_, dst, src, _assginkind) => {
                 // 直接进行修改
                 if *dst == condition {
                     flag = false;
                 } else if *src == condition {
                     let refer = borrow_reference(instr, &function.local_types);
-                    if let Some((src, dst, _)) = refer {
+                    if let Some((_src, dst, _)) = refer {
                         flag = flag & changed_loop_condition(function, content, dst, i-l+1);
                     }
                 }
             },
-            Bytecode::Call(_, dsts, oper, srcs, _) => {
+            Bytecode::Call(_, _dsts, oper, srcs, _) => {
                 let refer = borrow_reference(instr, &function.local_types);
                 if let Some((src, dst, _)) = refer {
                     if src == condition {

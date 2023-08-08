@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use std::{collections::BTreeMap, fmt::{self, Write}};
+use std::{collections::BTreeMap, fmt::{Write}};
 
 use crate::{move_ir::generate_bytecode::StacklessBytecodeGenerator, utils::utils::DotWeight};
 use move_binary_format::{

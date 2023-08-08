@@ -1,18 +1,18 @@
-use std::{fs, collections::BTreeMap};
-use move_cli::base::new;
-use serde_json::{self, Map, Value};
+use std::collections::BTreeMap;
+
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Detection_Results {
+pub struct DetectionResults {
     pub modules_count : usize,
     pub failed_modules_count : usize,
     pub total_time : usize,
-    pub modules : BTreeMap<String, Module_Details>,
+    pub modules : BTreeMap<String, ModuleDetails>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Module_Details {
+pub struct ModuleDetails {
     pub time : usize,
     pub function_counts : usize,
     pub native_function_counts : usize,
@@ -24,12 +24,12 @@ pub struct Module_Details {
 // pub struct Defect_Result {
 //     pub Unchecked_return : Vec<String>,
 //     pub Overflow : Vec<String>,
-//     pub Precision_Loss : Vec<String>,
-//     pub Infinite_Loop : Vec<String>,
-//     pub Unused_Private_Functions : Vec<String>,
-//     pub Unnecessary_Type_Conversion : Vec<String>,
-//     pub Unnecessary_Bool_Judgment : Vec<String>,
-//     pub Unused_Constant : Vec<String>,
+//     pub PrecisionLoss : Vec<String>,
+//     pub InfiniteLoop : Vec<String>,
+//     pub UnusedPrivateFunctions : Vec<String>,
+//     pub UnnecessaryTypeConversion : Vec<String>,
+//     pub UnnecessaryBoolJudgment : Vec<String>,
+//     pub UnusedConstant : Vec<String>,
 // }
 
 // impl Defect_Result {
@@ -37,39 +37,39 @@ pub struct Module_Details {
 //         Defect_Result {
 //             Unchecked_return : vec![],
 //             Overflow : vec![],
-//             Precision_Loss : vec![],
-//             Infinite_Loop : vec![],
-//             Unused_Private_Functions : vec![],
-//             Unnecessary_Type_Conversion : vec![],
-//             Unnecessary_Bool_Judgment : vec![],
-//             Unused_Constant : vec![],
+//             PrecisionLoss : vec![],
+//             InfiniteLoop : vec![],
+//             UnusedPrivateFunctions : vec![],
+//             UnnecessaryTypeConversion : vec![],
+//             UnnecessaryBoolJudgment : vec![],
+//             UnusedConstant : vec![],
 //         }
 //     }
 //     // pub fn update(&mut self, input: Vec<Vec<String>>) {
 //     //     self.Unchecked_return = input[0].clone();
 //     //     self.Overflow = input[1].clone();
-//     //     self.Precision_Loss = input[2].clone();
-//     //     self.Infinite_Loop = input[3].clone();
-//     //     self.Unused_Private_Functions = input[4].clone();
-//     //     self.Unnecessary_Type_Conversion = input[5].clone();
-//     //     self.Unnecessary_Bool_Judgment = input[6].clone();
-//     //     self.Unused_Constant = input[7].clone();
+//     //     self.PrecisionLoss = input[2].clone();
+//     //     self.InfiniteLoop = input[3].clone();
+//     //     self.UnusedPrivateFunctions = input[4].clone();
+//     //     self.UnnecessaryTypeConversion = input[5].clone();
+//     //     self.UnnecessaryBoolJudgment = input[6].clone();
+//     //     self.UnusedConstant = input[7].clone();
 //     // }
 // }
 
-impl Module_Details {
+impl ModuleDetails {
     pub fn new() -> Self {
         let mut detect_result = BTreeMap::new();
-        detect_result.insert("Unchecked_Return".to_string(), vec![]);
+        detect_result.insert("UncheckedReturn".to_string(), vec![]);
         detect_result.insert("Overflow".to_string(), vec![]);
-        detect_result.insert("Precision_Loss".to_string(), vec![]);
-        detect_result.insert("Infinite_Loop".to_string(), vec![]);
-        detect_result.insert("Unused_Private_Functions".to_string(), vec![]);
-        detect_result.insert("Unnecessary_Type_Conversion".to_string(), vec![]);
-        detect_result.insert("Unnecessary_Bool_Judgment".to_string(), vec![]);
-        detect_result.insert("Unused_Constant".to_string(), vec![]);
+        detect_result.insert("PrecisionLoss".to_string(), vec![]);
+        detect_result.insert("InfiniteLoop".to_string(), vec![]);
+        detect_result.insert("UnusedPrivateFunctions".to_string(), vec![]);
+        detect_result.insert("UnnecessaryTypeConversion".to_string(), vec![]);
+        detect_result.insert("UnnecessaryBoolJudgment".to_string(), vec![]);
+        detect_result.insert("UnusedConstant".to_string(), vec![]);
         let functions = BTreeMap::new();
-        Module_Details { 
+        ModuleDetails { 
             time: 0, 
             function_counts: 0, 
             native_function_counts: 0,
@@ -80,10 +80,10 @@ impl Module_Details {
     }
 }
 
-impl Detection_Results {
+impl DetectionResults {
     pub fn new() -> Self {
         let module_details = BTreeMap::new();
-        Detection_Results {
+        DetectionResults {
             modules_count : 0,
             failed_modules_count : 0,
             total_time : 0,

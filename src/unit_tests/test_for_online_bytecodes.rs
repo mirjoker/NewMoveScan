@@ -1,16 +1,14 @@
-use std::{path::PathBuf, collections::BTreeSet, fs, io::Write};
-use itertools::Itertools;
-use move_binary_format::{file_format::FunctionDefinitionIndex, access::ModuleAccess, CompiledModule};
-use num::ToPrimitive;
-use crate::{utils::{utils::{self, compile_module}, result_format::{Detection_Results, Module_Details}, defect_enum::Defects,}, move_ir::{generate_bytecode::StacklessBytecodeGenerator, packages::Packages}, 
-detect::{detect1::detect_unchecked_return, detect2::detect_overflow, detect3::detect_precision_loss, detect4::detect_infinite_loop, 
-    detect7::detect_unnecessary_type_conversion, detect8::detect_unnecessary_bool_judgment, detect5::detect_unused_constants, detect6::detect_unused_private_functions}};
-use std::time::{Duration, Instant};
+
+
+
+
+
+
 
 #[test]
 fn test_for_online_bytecodes() {
     let start = Instant::now();
-    let mut detection_results = Detection_Results::new();
+    let mut detection_results = DetectionResults::new();
     let dir = PathBuf::from("/home/yww/MoveScannerTest/src/sui_onchain_bytecode");
     let mut paths = Vec::new();
     utils::visit_dirs(&dir, &mut paths, false);
@@ -21,8 +19,8 @@ fn test_for_online_bytecodes() {
     let mut native_func_cnt = 0;
     let mut constant_cnt = 0;
     let mut defects_cnt = vec![0,0,0,0,0,0,0,0];
-    // let defects_name = vec!["Unchecked_return","Overflow","Precision_Loss","Infinite_Loop",
-    // "Unnecessary_Type_Conversion","Unnecessary_Bool_Judgment","Unused_Constant","Unused_Private_Functions"];
+    // let defects_name = vec!["Unchecked_return","Overflow","PrecisionLoss","InfiniteLoop",
+    // "UnnecessaryTypeConversion","UnnecessaryBoolJudgment","UnusedConstant","UnusedPrivateFunctions"];
     for filename in paths.iter() {
         bytecode_cnt += 1;
         let cm = compile_module(filename.to_path_buf());
@@ -48,7 +46,7 @@ fn test_for_online_bytecodes() {
         for (_, &stbgr) in packages.get_all_stbgr().iter(){
             let mname = filename.file_name().unwrap().to_str().unwrap();
             let start = Instant::now();
-            detection_results.modules.insert(mname.to_string(), Module_Details::new());
+            detection_results.modules.insert(mname.to_string(), ModuleDetails::new());
             detection_results.modules.get_mut(mname).unwrap().constant_counts = stbgr.module.constant_pool.len();
             constant_cnt += stbgr.module.constant_pool.len();
             let mut detects: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); 6];
@@ -66,7 +64,7 @@ fn test_for_online_bytecodes() {
 
                 if detect_unchecked_return(function, &stbgr.symbol_pool, idx, stbgr.module) {
                     detection_results.modules.get_mut(mname).unwrap().
-                    detect_result.get_mut("Unchecked_Return").unwrap().
+                    detect_result.get_mut("UncheckedReturn").unwrap().
                     push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                     defects_cnt[0] += 1;
                     detects[0].insert(idx);
@@ -80,28 +78,28 @@ fn test_for_online_bytecodes() {
                 }
                 if detect_precision_loss(function, &stbgr.symbol_pool) {
                     detection_results.modules.get_mut(mname).unwrap().
-                    detect_result.get_mut("Precision_Loss").unwrap().
+                    detect_result.get_mut("PrecisionLoss").unwrap().
                     push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                     defects_cnt[2] += 1;
                     detects[2].insert(idx);
                 }
                 if detect_infinite_loop(&packages, &stbgr, idx) {
                     detection_results.modules.get_mut(mname).unwrap().
-                    detect_result.get_mut("Infinite_Loop").unwrap().
+                    detect_result.get_mut("InfiniteLoop").unwrap().
                     push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                     defects_cnt[3] += 1;
                     detects[3].insert(idx);
                 }
                 if detect_unnecessary_type_conversion(function, &function.local_types) {
                     detection_results.modules.get_mut(mname).unwrap().
-                    detect_result.get_mut("Unnecessary_Type_Conversion").unwrap().
+                    detect_result.get_mut("UnnecessaryTypeConversion").unwrap().
                     push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                     defects_cnt[4] += 1;
                     detects[4].insert(idx);
                 }
                 if detect_unnecessary_bool_judgment(function, &function.local_types) {
                     detection_results.modules.get_mut(mname).unwrap().
-                    detect_result.get_mut("Unnecessary_Bool_Judgment").unwrap().
+                    detect_result.get_mut("UnnecessaryBoolJudgment").unwrap().
                     push(stbgr.module.identifier_at(stbgr.module.function_handle_at(stbgr.module.function_defs[idx].function).name).to_string());
                     defects_cnt[5] += 1;
                     detects[5].insert(idx);
@@ -111,7 +109,7 @@ fn test_for_online_bytecodes() {
             defects_cnt[6] += unused_constants.len();
             for (_, c) in unused_constants.iter().enumerate() {
                 detection_results.modules.get_mut(mname).unwrap().
-                detect_result.get_mut("Unused_Constant").unwrap().
+                detect_result.get_mut("UnusedConstant").unwrap().
                 push(format!("{:?}", c));
             }
             let unused_private_functions = detect_unused_private_functions(&stbgr);
@@ -121,7 +119,7 @@ fn test_for_online_bytecodes() {
                 .collect_vec();
             defects_cnt[7] += unused_private_functions.len();
             detection_results.modules.get_mut(mname).unwrap().
-            detect_result.get_mut("Unused_Private_Functions").unwrap().append(&mut unused_private_function_names.clone());
+            detect_result.get_mut("UnusedPrivateFunctions").unwrap().append(&mut unused_private_function_names.clone());
 
 
             for (idx, function) in stbgr.functions.iter().enumerate() {

@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser};
 
 #[derive(Parser)]
 #[command(author="yule liteng", version="0.01", about="This is a static analysis tool for move smart contracts.", long_about = None)]

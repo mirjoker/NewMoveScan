@@ -1,15 +1,14 @@
-use std::{vec, collections::BTreeMap, str::FromStr, ops::{Rem, Sub, Add, Mul}};
+use std::{vec, collections::BTreeMap, str::FromStr, ops::{Rem, Sub}};
 use ethnum::U256;
 
 use move_binary_format::{access::ModuleAccess, views::FunctionHandleView, file_format::{FunctionHandleIndex, FunctionDefinitionIndex}};
-use move_stackless_bytecode::{stackless_bytecode::{
+use move_stackless_bytecode::stackless_bytecode::{
     Bytecode::{self, *}, Operation::{*, self}, Constant, AssignKind,
-}};
-use move_model::{ty::{Type, TypeDisplayContext, PrimitiveType}, ast::ModuleName};
+};
+use move_model::ty::{Type, TypeDisplayContext, PrimitiveType};
 
-use crate::utils::utils::display_type;
 
-use super::{generate_bytecode::StacklessBytecodeGenerator, bytecode_display::oper_display, packages::Packages};
+use super::{generate_bytecode::StacklessBytecodeGenerator, bytecode_display::oper_display};
 
 #[derive(Debug, Clone)]
 pub enum Val {
@@ -181,7 +180,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             let mut data_depent = DataDepent{ data: BTreeMap::new() };
 
             let function_defintion_idx = FunctionDefinitionIndex::new(idx as u16);
-            let self_fid = self.module_data.function_idx_to_id.get(&function_defintion_idx).unwrap();
+            let _self_fid = self.module_data.function_idx_to_id.get(&function_defintion_idx).unwrap();
 
             // 记录函数参数类型
             for i in 0..view.arg_count() {
@@ -358,7 +357,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
     }
 }
 
-
+#[allow(unused)]
 fn is_uint(ty: &Type) -> bool {
     let mut flag = false;
     if let Type::Primitive(bty) = ty {

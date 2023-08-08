@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![allow(non_snake_case)]
 
 // mod列表
 pub mod cli;
