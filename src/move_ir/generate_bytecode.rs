@@ -64,7 +64,6 @@ impl FunctionInfo {
         }
     }
 }
-
 pub struct StacklessBytecodeGenerator<'a> {
     pub module: &'a CompiledModule,
     pub module_data: ModuleData,

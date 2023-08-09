@@ -23,7 +23,7 @@ MoveScanner is a bytecode based move static analysis tool written in rust.
 
     ```
     git pull
-    ./build
+    ./buildls
     ```
 4. Start a new terminal session, enjoy!
 
@@ -32,13 +32,20 @@ MoveScanner is a bytecode based move static analysis tool written in rust.
 $ MoveScanner -h
 This is a static analysis tool for move smart contracts.
 
-Usage: MoveScanner [OPTIONS]
+Usage: MoveScanner [OPTIONS] --path <PATH> [COMMAND]
+
+Commands:
+  printer   
+  detector  
+  help      Print this message or the help of the given subcommand(s)
 
 Options:
-  -f, --filedir <FILEDIR>      The project under this dir will be analyzed
-  -j, --json-file <JSON_FILE>  Write the result in json [default: result.json]
-  -h, --help                   Print help
-  -V, --version                Print version
+  -p, --path <PATH>        The project under this dir will be analyzed
+  -o, --output <OUTPUT>    output location [default: result.json]
+  -j, --json               Print results as json
+  -i, --ir-type <IR_TYPE>  IR Type [possible values: sb, cm, cfg, du, f-ns, cg]
+  -h, --help               Print help
+  -V, --version            Print version
 ```
 
 Example:
@@ -46,20 +53,20 @@ Example:
 ```shell
 # -f <bytecode_dir> 
 # Tips: Normally you should input 'build/.../bytecode_modules'
-MoveScanner -f "./testdata/examples_mv/aptos"
+MoveScanner -p "./testdata/examples_mv/aptos"
 
 # -f <bytecode_file>
-MoveScanner -f "./testdata/examples_mv/aptos/overflow.mv"
+MoveScanner -p "./testdata/examples_mv/aptos/overflow.mv"
 ```
 
 The result is output to `result.json` by default, you can customize the output file name and path by running `-j`：
 
 ```shell
 # filename
-MoveScanner -f "./testdata/examples_mv/aptos" -j my_result.json
+MoveScanner -p "./testdata/examples_mv/aptos" -o my_result.json
 
 # path and filename
-MoveScanner -f "./testdata/examples_mv/aptos" -j /my/path/my_result.json
+MoveScanner -p "./testdata/examples_mv/aptos" -o /my/path/my_result.json
 ```
 
 ## Detectors

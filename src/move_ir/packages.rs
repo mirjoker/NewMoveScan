@@ -1,8 +1,5 @@
 use std::collections::BTreeMap;
-
-
 use move_model::{model::FunId};
-
 use super::generate_bytecode::{StacklessBytecodeGenerator, FunctionInfo};
 
 
