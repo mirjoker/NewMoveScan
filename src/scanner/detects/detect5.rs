@@ -1,9 +1,8 @@
 // unused_constant
 
-use move_binary_format::{file_format::{Bytecode as MoveBytecode}, internals::ModuleIndex};
-use move_core_types::value::MoveValue;
 use crate::move_ir::generate_bytecode::StacklessBytecodeGenerator;
-
+use move_binary_format::{file_format::Bytecode as MoveBytecode, internals::ModuleIndex};
+use move_core_types::value::MoveValue;
 
 pub fn detect_unused_constants(stbgr: &StacklessBytecodeGenerator) -> Vec<MoveValue> {
     let cm = stbgr.module;
@@ -16,10 +15,10 @@ pub fn detect_unused_constants(stbgr: &StacklessBytecodeGenerator) -> Vec<MoveVa
                 match code {
                     MoveBytecode::LdConst(idx) => {
                         is_visited[idx.into_index()] = true;
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
-            };
+            }
         } else {
             continue;
         }

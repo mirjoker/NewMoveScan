@@ -1,8 +1,3 @@
-use itertools::Itertools;
-use move_binary_format::{access::ModuleAccess, file_format::FunctionDefinitionIndex};
-use std::io::Write;
-use std::time::Instant;
-use std::{fs, path::PathBuf};
 use crate::move_ir::packages::Packages;
 use crate::{
     cli::parser::*,
@@ -14,11 +9,14 @@ use crate::{
             detect5::detect_unused_constants, detect6::detect_unused_private_functions,
             detect7::detect_unnecessary_type_conversion, detect8::detect_unnecessary_bool_judgment,
         },
-        result::{DetectorType, FunctionType, ModuleInfo, Result, Status,PrettyResult},
+        result::{DetectorType, FunctionType, ModuleInfo, PrettyResult, Result, Status},
     },
     utils::utils::{self, compile_module},
 };
+use itertools::Itertools;
+use move_binary_format::{access::ModuleAccess, file_format::FunctionDefinitionIndex};
 use num::ToPrimitive;
+use std::{fs, io::Write, path::PathBuf, time::Instant};
 
 pub struct Detector {
     pub args: Args,
@@ -32,20 +30,20 @@ impl Detector {
             result: Result::empty(),
         }
     }
-    pub fn get_function_name(&self, idx:usize,stbgr: &StacklessBytecodeGenerator) -> String{
+    pub fn get_function_name(&self, idx: usize, stbgr: &StacklessBytecodeGenerator) -> String {
         let func_name = stbgr
-        .module
-        .identifier_at(
-            stbgr
-                .module
-                .function_handle_at(stbgr.module.function_defs[idx].function)
-                .name,
-        )
-        .to_string();
-        return func_name
+            .module
+            .identifier_at(
+                stbgr
+                    .module
+                    .function_handle_at(stbgr.module.function_defs[idx].function)
+                    .name,
+            )
+            .to_string();
+        return func_name;
     }
 
-    pub fn output_result(&self){
+    pub fn output_result(&self) {
         let json_result = serde_json::to_string(&self.result).ok().unwrap();
         let pretty_result = PrettyResult::from(self.result.clone());
         if let Some(output) = &self.args.output {
@@ -54,13 +52,13 @@ impl Detector {
             file.write(json_result.as_bytes())
                 .expect("Failed to write to json file");
         }
-        if self.args.json{
+        if self.args.json {
             let pretty_json_result = serde_json::to_string(&pretty_result).ok().unwrap();
             println!("{pretty_json_result}");
         // 命令行以 json 格式输出
-        }else {
+        } else {
             println!("{pretty_result}");
-        // 以非命令行格式输出
+            // 以非命令行格式输出
         }
     }
 
@@ -104,7 +102,10 @@ impl Detector {
             let module_time_start = Instant::now();
             let mut module_info = ModuleInfo::empty();
             module_info.constant_count = stbgr.module.constant_pool.len();
-            *module_info.function_count.get_mut(&FunctionType::All).unwrap() = stbgr.functions.len();
+            *module_info
+                .function_count
+                .get_mut(&FunctionType::All)
+                .unwrap() = stbgr.functions.len();
             // 遍历stbgr中的functions
             for (idx, function) in stbgr.functions.iter().enumerate() {
                 let func_define = stbgr
@@ -118,34 +119,42 @@ impl Detector {
                     continue;
                 };
                 let func_name = self.get_function_name(idx, stbgr);
-                
+
                 // 初始化 functions
                 module_info.init_functions(func_name.clone());
 
                 // 更新 detectors 和 functions
                 if detect_unchecked_return(function, &stbgr.symbol_pool, idx, stbgr.module) {
-                    module_info.update_detectors(DetectorType::UncheckedReturn,func_name.clone());
-                    module_info.update_functions(func_name.clone(),DetectorType::UncheckedReturn);
+                    module_info.update_detectors(DetectorType::UncheckedReturn, func_name.clone());
+                    module_info.update_functions(func_name.clone(), DetectorType::UncheckedReturn);
                 }
                 if detect_overflow(&packages, &stbgr, idx) {
-                    module_info.update_detectors(DetectorType::Overflow,func_name.clone());
-                    module_info.update_functions(func_name.clone(),DetectorType::Overflow);
+                    module_info.update_detectors(DetectorType::Overflow, func_name.clone());
+                    module_info.update_functions(func_name.clone(), DetectorType::Overflow);
                 }
                 if detect_precision_loss(function, &stbgr.symbol_pool) {
-                    module_info.update_detectors(DetectorType::PrecisionLoss,func_name.clone());
-                    module_info.update_functions(func_name.clone(),DetectorType::PrecisionLoss);
+                    module_info.update_detectors(DetectorType::PrecisionLoss, func_name.clone());
+                    module_info.update_functions(func_name.clone(), DetectorType::PrecisionLoss);
                 }
                 if detect_infinite_loop(&packages, &stbgr, idx) {
-                    module_info.update_detectors(DetectorType::InfiniteLoop,func_name.clone());
-                    module_info.update_functions(func_name.clone(),DetectorType::InfiniteLoop);
+                    module_info.update_detectors(DetectorType::InfiniteLoop, func_name.clone());
+                    module_info.update_functions(func_name.clone(), DetectorType::InfiniteLoop);
                 }
                 if detect_unnecessary_type_conversion(function, &function.local_types) {
-                    module_info.update_detectors(DetectorType::UnnecessaryTypeConversion,func_name.clone());
-                    module_info.update_functions(func_name.clone(),DetectorType::UnnecessaryTypeConversion);
+                    module_info.update_detectors(
+                        DetectorType::UnnecessaryTypeConversion,
+                        func_name.clone(),
+                    );
+                    module_info.update_functions(
+                        func_name.clone(),
+                        DetectorType::UnnecessaryTypeConversion,
+                    );
                 }
                 if detect_unnecessary_bool_judgment(function, &function.local_types) {
-                    module_info.update_detectors(DetectorType::UnnecessaryBoolJudgment,func_name.clone());
-                    module_info.update_functions(func_name.clone(),DetectorType::UnnecessaryBoolJudgment);
+                    module_info
+                        .update_detectors(DetectorType::UnnecessaryBoolJudgment, func_name.clone());
+                    module_info
+                        .update_functions(func_name.clone(), DetectorType::UnnecessaryBoolJudgment);
                 }
             }
             let unused_private_functions = detect_unused_private_functions(&stbgr);
@@ -153,19 +162,26 @@ impl Detector {
                 .iter()
                 .map(|func| {
                     let func_name = func.symbol().display(&stbgr.symbol_pool).to_string();
-                    module_info.update_functions(func_name.clone(),DetectorType::UnusedPrivateFunctions);
-                    return func_name
+                    module_info
+                        .update_functions(func_name.clone(), DetectorType::UnusedPrivateFunctions);
+                    return func_name;
                 })
                 .collect_vec();
 
-            module_info.updates_detectors(DetectorType::UnusedConstant, detect_unused_constants(&stbgr).iter().map(|x|{
-                format!("{:?}",x)
-            }).collect_vec());
-            module_info.updates_detectors(DetectorType::UnusedPrivateFunctions, unused_private_function_names);
+            module_info.updates_detectors(
+                DetectorType::UnusedConstant,
+                detect_unused_constants(&stbgr)
+                    .iter()
+                    .map(|x| format!("{:?}", x))
+                    .collect_vec(),
+            );
+            module_info.updates_detectors(
+                DetectorType::UnusedPrivateFunctions,
+                unused_private_function_names,
+            );
             module_info.time = module_time_start.elapsed().as_micros().to_usize().unwrap();
-            self.result.add_module( mname.to_string(), module_info);
+            self.result.add_module(mname.to_string(), module_info);
         }
         self.result.total_time = time_start.elapsed().as_micros().to_usize().unwrap();
-
     }
 }

@@ -1,9 +1,6 @@
 // overflow
 
-use crate::move_ir::{
-    generate_bytecode::StacklessBytecodeGenerator,
-    packages::Packages,
-};
+use crate::move_ir::{generate_bytecode::StacklessBytecodeGenerator, packages::Packages};
 use move_model::ty::{PrimitiveType, Type};
 use move_stackless_bytecode::stackless_bytecode::{Bytecode, Operation};
 
