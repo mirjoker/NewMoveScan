@@ -9,10 +9,10 @@ use move_stackless_bytecode::stackless_bytecode::{Bytecode, Operation};
 
 pub fn detect_unchecked_return(
     function: &FunctionInfo,
-    _symbol_pool: &SymbolPool,
+    symbol_pool: &SymbolPool,
     _idx: usize,
     _cm: &CompiledModule,
-) -> bool {
+) -> Vec<String> {
     // let mut ret_flag = false;
     let mut be_call_funcs: Vec<Symbol> = Vec::new();
     for (code_offset, bytecode) in function.code.iter().enumerate() {
@@ -44,12 +44,12 @@ pub fn detect_unchecked_return(
             }
         }
     }
-    if be_call_funcs.is_empty() {
-        return false;
-    } else {
-        for _fun in be_call_funcs.iter() {
+    let mut ret: Vec<String> = Vec::new();
+    if !be_call_funcs.is_empty() {
+        for fun in be_call_funcs.iter() {
+            ret.push(symbol_pool.string(*fun).to_string());
             // println!("function **:{} has return values but do not be used in {}", symbol_pool.string(*fun), cm.identifier_at(cm.function_handle_at(cm.function_defs[idx].function).name));
         }
-        return true;
     }
+    return ret;
 }

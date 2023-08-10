@@ -124,8 +124,10 @@ impl Detector {
                 module_info.init_functions(func_name.clone());
 
                 // 更新 detectors 和 functions
-                if detect_unchecked_return(function, &stbgr.symbol_pool, idx, stbgr.module) {
-                    module_info.update_detectors(DetectorType::UncheckedReturn, func_name.clone());
+                let unchecked_return_func_list = detect_unchecked_return(function, &stbgr.symbol_pool, idx, stbgr.module);
+                if !unchecked_return_func_list.is_empty() {
+                    let func_str = format!("{}({})", func_name.clone(), unchecked_return_func_list.into_iter().join(","));
+                    module_info.update_detectors(DetectorType::UncheckedReturn, func_str);
                     module_info.update_functions(func_name.clone(), DetectorType::UncheckedReturn);
                 }
                 if detect_overflow(&packages, &stbgr, idx) {
