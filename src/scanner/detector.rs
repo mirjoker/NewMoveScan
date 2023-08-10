@@ -14,7 +14,7 @@ use crate::{
             detect5::detect_unused_constants, detect6::detect_unused_private_functions,
             detect7::detect_unnecessary_type_conversion, detect8::detect_unnecessary_bool_judgment,
         },
-        result::{DetectorType, FunctionType, ModuleInfo, Result, Status},
+        result::{DetectorType, FunctionType, ModuleInfo, Result, Status,PrettyResult},
     },
     utils::utils::{self, compile_module},
 };
@@ -46,17 +46,20 @@ impl Detector {
     }
 
     pub fn output_result(&self){
-        let json_output = serde_json::to_string(&self.result).ok().unwrap();
+        let json_result = serde_json::to_string(&self.result).ok().unwrap();
+        let pretty_result = PrettyResult::from(self.result.clone());
         if let Some(output) = &self.args.output {
             // 输出到指定目录
             let mut file = fs::File::create(output).expect("Failed to create json file");
-            file.write(json_output.as_bytes())
+            file.write(json_result.as_bytes())
                 .expect("Failed to write to json file");
         }
         if self.args.json{
-            println!("{json_output}")
+            let pretty_json_result = serde_json::to_string(&pretty_result).ok().unwrap();
+            println!("{pretty_json_result}");
         // 命令行以 json 格式输出
         }else {
+            println!("{pretty_result}");
         // 以非命令行格式输出
         }
     }
