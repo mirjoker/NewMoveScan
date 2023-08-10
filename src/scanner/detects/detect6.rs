@@ -1,8 +1,10 @@
 // unused_private_functions
 
-use move_binary_format::{file_format::Visibility, views::FunctionDefinitionView, access::ModuleAccess};
-use move_model::model::{QualifiedId, FunId};
 use crate::move_ir::generate_bytecode::StacklessBytecodeGenerator;
+use move_binary_format::{
+    access::ModuleAccess, file_format::Visibility, views::FunctionDefinitionView,
+};
+use move_model::model::{FunId, QualifiedId};
 use petgraph::Direction;
 
 fn get_unused_functions<'a>(stbgr: &'a StacklessBytecodeGenerator) -> Vec<&'a QualifiedId<FunId>> {
@@ -13,7 +15,9 @@ fn get_unused_functions<'a>(stbgr: &'a StacklessBytecodeGenerator) -> Vec<&'a Qu
         //     // 理论上没有必要的操作，但是有脏东西，如aborted
         //     continue;
         // }
-        let neighbors = stbgr.call_graph.neighbors_directed(*nid, Direction::Incoming);
+        let neighbors = stbgr
+            .call_graph
+            .neighbors_directed(*nid, Direction::Incoming);
         if neighbors.into_iter().next().is_none() {
             unused_functions.push(fid);
         }
@@ -27,12 +31,14 @@ pub fn detect_unused_private_functions(stbgr: &StacklessBytecodeGenerator) -> Ve
     for func in unused_functions {
         let function_data = stbgr.module_data.function_data.get(&func.id).unwrap();
         let view = FunctionDefinitionView::new(
-            stbgr.module, 
-            stbgr.module.function_def_at(function_data.def_idx)
+            stbgr.module,
+            stbgr.module.function_def_at(function_data.def_idx),
         );
-        if view.visibility() == Visibility::Private && !view.is_entry() 
-            && !view.name().as_str().starts_with("init"){
-                unused_private_functions.push(func.id);
+        if view.visibility() == Visibility::Private
+            && !view.is_entry()
+            && !view.name().as_str().starts_with("init")
+        {
+            unused_private_functions.push(func.id);
         }
     }
     unused_private_functions

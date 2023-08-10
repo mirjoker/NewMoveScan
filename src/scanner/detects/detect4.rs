@@ -3,18 +3,34 @@
 use std::{collections::BTreeSet, vec};
 
 use move_model::ty::Type;
-use move_stackless_bytecode::{stackless_control_flow_graph::BlockContent, stackless_bytecode::{Bytecode, AssignKind, Operation}};
+use move_stackless_bytecode::{
+    stackless_bytecode::{AssignKind, Bytecode, Operation},
+    stackless_control_flow_graph::BlockContent,
+};
 
-use crate::{move_ir::{generate_bytecode::{StacklessBytecodeGenerator, FunctionInfo}, fatloop::get_loops, control_flow_graph::BlockId, packages::Packages}};
+use crate::move_ir::{
+    control_flow_graph::BlockId,
+    fatloop::get_loops,
+    generate_bytecode::{FunctionInfo, StacklessBytecodeGenerator},
+    packages::Packages,
+};
 
 #[allow(unused)]
-pub fn detect_infinite_loop(_packages: &Packages, stbgr: &StacklessBytecodeGenerator, idx: usize) -> bool {
+pub fn detect_infinite_loop(
+    _packages: &Packages,
+    stbgr: &StacklessBytecodeGenerator,
+    idx: usize,
+) -> bool {
     let function = &stbgr.functions[idx];
     let (_natural_loops, fat_loops) = get_loops(function);
     // let data_depent = data_dependency(packages, stbgr, idx, 1);
     let data_depent = &stbgr.data_dependency[idx];
     let cfg = function.cfg.as_ref().unwrap();
-    let mut ret_flag = if fat_loops.fat_loops.len() > 0 {true} else {false};
+    let mut ret_flag = if fat_loops.fat_loops.len() > 0 {
+        true
+    } else {
+        false
+    };
     for (_bid, fat_loop) in fat_loops.fat_loops.iter() {
         let mut branchs: BTreeSet<BlockId> = BTreeSet::new();
         let mut unions: BTreeSet<BlockId> = BTreeSet::new();
@@ -40,7 +56,7 @@ pub fn detect_infinite_loop(_packages: &Packages, stbgr: &StacklessBytecodeGener
                 if branchs.contains(bid) {
                     let (mut l, mut u): (u16, u16) = (0, 0);
                     if let BlockContent::Basic { lower, upper } = content {
-                        l = *lower; 
+                        l = *lower;
                         u = *upper;
                     }
                     // 条件分支语句
@@ -65,14 +81,19 @@ pub fn detect_infinite_loop(_packages: &Packages, stbgr: &StacklessBytecodeGener
     ret_flag
 }
 
-fn changed_loop_condition(function: &FunctionInfo, content: &BlockContent, condition: usize, offset: u16) -> bool {
+fn changed_loop_condition(
+    function: &FunctionInfo,
+    content: &BlockContent,
+    condition: usize,
+    offset: u16,
+) -> bool {
     let mut flag = true;
     let (mut l, mut u): (u16, u16) = (0, 0);
     if let BlockContent::Basic { lower, upper } = content {
         l = *lower;
         u = *upper;
     }
-    for i in (l+offset)..u {
+    for i in (l + offset)..u {
         let instr = &function.code[i as usize];
         match instr {
             Bytecode::Assign(_, dst, src, _assginkind) => {
@@ -82,15 +103,15 @@ fn changed_loop_condition(function: &FunctionInfo, content: &BlockContent, condi
                 } else if *src == condition {
                     let refer = borrow_reference(instr, &function.local_types);
                     if let Some((_src, dst, _)) = refer {
-                        flag = flag & changed_loop_condition(function, content, dst, i-l+1);
+                        flag = flag & changed_loop_condition(function, content, dst, i - l + 1);
                     }
                 }
-            },
+            }
             Bytecode::Call(_, _dsts, oper, srcs, _) => {
                 let refer = borrow_reference(instr, &function.local_types);
                 if let Some((src, dst, _)) = refer {
                     if src == condition {
-                        flag = flag & changed_loop_condition(function, content, dst, i-l+1);
+                        flag = flag & changed_loop_condition(function, content, dst, i - l + 1);
                     }
                 }
                 if let Operation::Function(_, _, _) = oper {
@@ -98,48 +119,38 @@ fn changed_loop_condition(function: &FunctionInfo, content: &BlockContent, condi
                         flag = false;
                     }
                 }
-            },
+            }
             _ => {}
         }
     }
     flag
 }
 
-fn borrow_reference(instr: &Bytecode, local_types: &Vec<Type>) ->Option<(usize, usize, bool)> {
+fn borrow_reference(instr: &Bytecode, local_types: &Vec<Type>) -> Option<(usize, usize, bool)> {
     match instr {
-        Bytecode::Assign(_, dst, src, kind) => {
-            match kind {
-                AssignKind::Move => { None }
-                AssignKind::Copy => { 
-                    if local_types[*src].is_mutable_reference() {
-                        Some((*src, *dst, false))
-                    } else {
-                        None
-                    } 
-                }
-                AssignKind::Store => {
-                    if local_types[*src].is_mutable_reference() {
-                        Some((*src, *dst, false))
-                    } else {
-                        None
-                    }
+        Bytecode::Assign(_, dst, src, kind) => match kind {
+            AssignKind::Move => None,
+            AssignKind::Copy => {
+                if local_types[*src].is_mutable_reference() {
+                    Some((*src, *dst, false))
+                } else {
+                    None
                 }
             }
-        }
-        Bytecode::Call(_, dsts, oper, srcs, _) => {
-            match oper {
-                Operation::BorrowLoc => {
-                    Some((srcs[0], dsts[0], false))
+            AssignKind::Store => {
+                if local_types[*src].is_mutable_reference() {
+                    Some((*src, *dst, false))
+                } else {
+                    None
                 }
-                Operation::BorrowGlobal(_, _, _) => {
-                    Some((srcs[0], dsts[0], false))
-                }
-                Operation::BorrowField(_, _, _, _) => {
-                    Some((srcs[0], dsts[0], true))
-                }
-                _ => { None }
             }
-        }
-        _ => { None }
+        },
+        Bytecode::Call(_, dsts, oper, srcs, _) => match oper {
+            Operation::BorrowLoc => Some((srcs[0], dsts[0], false)),
+            Operation::BorrowGlobal(_, _, _) => Some((srcs[0], dsts[0], false)),
+            Operation::BorrowField(_, _, _, _) => Some((srcs[0], dsts[0], true)),
+            _ => None,
+        },
+        _ => None,
     }
 }
