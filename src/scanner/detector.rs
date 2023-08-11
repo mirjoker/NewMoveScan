@@ -124,8 +124,11 @@ impl Detector {
                 module_info.init_functions(func_name.clone());
 
                 // 更新 detectors 和 functions
-                let unchecked_return_func_list = detect_unchecked_return(function, &stbgr.symbol_pool, idx, stbgr.module);
+                let mut unchecked_return_func_list = detect_unchecked_return(function, &stbgr.symbol_pool, idx, stbgr.module);
                 if !unchecked_return_func_list.is_empty() {
+                    // 先排序，再去重。Tips：dedup 用于去除连续的重复元素
+                    unchecked_return_func_list.sort();
+                    unchecked_return_func_list.dedup();
                     let func_str = format!("{}({})", func_name.clone(), unchecked_return_func_list.into_iter().join(","));
                     module_info.update_detectors(DetectorType::UncheckedReturn, func_str);
                     module_info.update_functions(func_name.clone(), DetectorType::UncheckedReturn);

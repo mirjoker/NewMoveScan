@@ -1,5 +1,7 @@
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
 pub type ModuleName = String;
 pub type FunctionName = String;
 
@@ -199,12 +201,15 @@ impl std::fmt::Display for PrettyResult {
             writeln!(f,"no: {}",module_index)?;
             writeln!(f,"module_name: {}",module_name)?;
             for (detector_type,values) in detectors_result{
-                write!(f,"\x1B[31m{}\x1B[0m: [ ",detector_type)?;
-                for (value_index,value) in values.iter().enumerate(){
-                    if value_index < values.len() -1 {
-                        write!(f,"{}, ",value)?;
-                    }else{
-                        writeln!(f,"{} ]",value)?;
+                write!(f,"\x1B[31m{}\x1B[0m: ",detector_type)?;
+                let values_str = values.iter().join(",");
+                match detector_type {
+                    DetectorType::UncheckedReturn => {
+                        let color_value_str  = &values_str.replace("(", "\x1B[33m(").replace(")", ")\x1B[0m");
+                        writeln!(f,"[ {} ]",color_value_str)?;
+                    }
+                    _ => {
+                        writeln!(f,"[ {} ] ",values_str)?;
                     }
                 }
             }
