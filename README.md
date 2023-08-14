@@ -37,13 +37,14 @@ A static analysis tool based on bytecode for move smart contracts.
 Usage: MoveScanner [OPTIONS] --path <PATH> [COMMAND]
 
 Commands:
-  printer
-  detector
+  printer   
+  detector  
   help      Print this message or the help of the given subcommand(s)
 
 Options:
   -p, --path <PATH>        Path to input dir/file
   -o, --output <OUTPUT>    Path to output file [default: result.json]
+  -n, --none               Print nothing on terminal
   -j, --json               Print result as json on terminal
   -i, --ir-type <IR_TYPE>  IR type [possible values: sb, cm, cfg, du, fs, cg]
   -h, --help               Print help
@@ -73,7 +74,7 @@ MoveScanner -p "./testdata/examples_mv/aptos" -o my_result.json
 MoveScanner -p "./testdata/examples_mv/aptos" -o /my/path/my_result.json
 ```
 
-if you want to print result as json on termianl, use `-j`
+if you want to print result as json on termianl, use `-j`, if you don't want to output results on the command line, use `-n`.
 
 ### Printer
 

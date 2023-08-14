@@ -52,6 +52,9 @@ impl Detector {
             file.write(json_result.as_bytes())
                 .expect("Failed to write to json file");
         }
+        if self.args.none {
+            return
+        }
         if self.args.json {
             let pretty_json_result = serde_json::to_string(&pretty_result).ok().unwrap();
             println!("{pretty_json_result}");

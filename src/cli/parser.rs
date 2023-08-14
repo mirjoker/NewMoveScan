@@ -8,6 +8,9 @@ pub struct Args {
 
     #[clap(short = 'o', long = "output", help = "Path to output file", default_value=Some("result.json"))]
     pub output: Option<String>,
+    
+    #[clap(short = 'n', long = "none", help = "Print nothing on terminal")]
+    pub none: bool,
 
     #[clap(short = 'j',long = "json",help="Print result as json on terminal")]
     pub json: bool,
