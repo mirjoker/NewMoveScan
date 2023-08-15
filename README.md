@@ -58,20 +58,20 @@ Options:
 ```shell
 # -f <bytecode_dir>
 # Tips: Normally you should input 'build/.../bytecode_modules'
-MoveScanner -p "./testdata/examples_mv/aptos"
+MoveScanner -p "./res/examples_mv/aptos"
 
 # -f <bytecode_file>
-MoveScanner -p "./testdata/examples_mv/aptos/overflow.mv"
+MoveScanner -p "./res/examples_mv/aptos/overflow.mv"
 ```
 
 The result is output to `result.json` by default, you can customize the output file name and path by running `-o`：
 
 ```shell
 # filename
-MoveScanner -p "./testdata/examples_mv/aptos" -o my_result.json
+MoveScanner -p "./res/examples_mv/aptos" -o my_result.json
 
 # path and filename
-MoveScanner -p "./testdata/examples_mv/aptos" -o /my/path/my_result.json
+MoveScanner -p "./res/examples_mv/aptos" -o /my/path/my_result.json
 ```
 
 if you want to print result as json on termianl, use `-j`, if you don't want to output results on the command line, use `-n`.
@@ -88,7 +88,7 @@ The printer can output some intermediate representations:
 - `cg`: Function Call Graph
 
 ```shell
-MoveScanner -p "./testdata/examples_mv/aptos" -i sb printer
+MoveScanner -p "./res/examples_mv/aptos" -i sb printer
 ```
 ## Detector Define
 

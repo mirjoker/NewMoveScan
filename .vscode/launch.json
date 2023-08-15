@@ -38,7 +38,7 @@
                     "kind": "bin"
                 }
             },
-            "args": ["-p", "./testdata/examples_mv/aptos/DemoCoin.mv"],
+            "args": ["-p", "./res/examples_mv/aptos/DemoCoin.mv"],
             "cwd": "${workspaceFolder}"
         },
         {
