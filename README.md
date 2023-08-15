@@ -4,29 +4,34 @@ MoveScanner is a bytecode based move static analysis tool written in rust.
 
 ## QuickStart
 
-1. Run `build.sh`:
+**Step 1.** Run `build.sh`:
 
-   ```shell
-   cd MoveScanner
-   ./build
-   ```
+```shell
+cd MoveScanner
+./build.sh
+```
 
-2. Please add the following to your shell configuration file(e.g., `~/.bashrc`, `~/.zshrc`):
+**Step 2.** Configure Shell (Option)
 
-   ```shell
-   vim ~/.bashrc # Choose your own shell configuration file
-   export MOVESCANNER_ROOT="$HOME/.MoveScanner"
-   export PATH="$MOVESCANNER_ROOT/bin:$PATH"
-   ```
+`build.sh` will automatically configure MoveScanner for your default shell. 
 
-3. If you want to update MoveScanner:
+If you wish to use MoveScanner on another shell, you should add the following to shell configuration file.
 
-   ```
-   git pull
-   ./buildls
-   ```
+```shell
+export MOVESCANNER_ROOT="$HOME/.MoveScanner"
+export PATH="$MOVESCANNER_ROOT/bin:$PATH"
+```
 
-4. Start a new terminal session, enjoy!
+Otherwise, you can skip `Step 2`.
+
+**Step 3.** If you want to update MoveScanner:
+
+```
+git pull
+./build.sh
+```
+
+**Step 4.** Start a new terminal session, enjoy!
 
 ## Usage
 
@@ -37,8 +42,8 @@ A static analysis tool based on bytecode for move smart contracts.
 Usage: MoveScanner [OPTIONS] --path <PATH> [COMMAND]
 
 Commands:
-  printer   
-  detector  
+  printer
+  detector
   help      Print this message or the help of the given subcommand(s)
 
 Options:
@@ -90,6 +95,7 @@ The printer can output some intermediate representations:
 ```shell
 MoveScanner -p "./res/examples_mv/aptos" -i sb printer
 ```
+
 ## Detector Define
 
 | id  | Detector                  | Define                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
