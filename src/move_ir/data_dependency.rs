@@ -1,28 +1,41 @@
-use std::{vec, collections::BTreeMap, str::FromStr, ops::{Rem, Sub}};
 use ethnum::U256;
-
-use move_binary_format::{access::ModuleAccess, views::FunctionHandleView, file_format::{FunctionHandleIndex, FunctionDefinitionIndex}};
-use move_stackless_bytecode::stackless_bytecode::{
-    Bytecode::{self, *}, Operation::{*, self}, Constant, AssignKind,
+use std::{
+    cell::RefCell,
+    collections::BTreeMap,
+    ops::{Rem, Sub},
+    rc::Rc,
+    str::FromStr,
+    vec,
 };
-use move_model::ty::{Type, TypeDisplayContext, PrimitiveType};
 
+use move_binary_format::{
+    access::ModuleAccess,
+    file_format::{FunctionDefinitionIndex, FunctionHandleIndex},
+    views::FunctionHandleView,
+};
+use move_model::ty::{PrimitiveType, Type, TypeDisplayContext};
+use move_stackless_bytecode::stackless_bytecode::{
+    AssignKind,
+    Bytecode::{self, *},
+    Constant,
+    Operation::{self, *},
+};
 
-use super::{generate_bytecode::StacklessBytecodeGenerator, bytecode_display::oper_display};
+use super::{bytecode_display::oper_display, generate_bytecode::StacklessBytecodeGenerator};
 
 #[derive(Debug, Clone)]
 pub enum Val {
     ByteCode(Bytecode), // 运算符
     // 无子节点
-    Const(Constant), // 常量
-    ParamType(Type), // 函数参数类型
+    Const(Constant),  // 常量
+    ParamType(Type),  // 函数参数类型
     AssIgn(Bytecode), // move copy store
 }
 
 #[derive(Debug, Clone)]
 pub struct Node {
     pub value: Val,
-    pub subnodes: Vec<Node>,
+    pub subnodes: Vec<Rc<RefCell<Node>>>,
     pub max: Option<U256>,
     pub is_constant: bool,
 }
@@ -33,11 +46,16 @@ impl Node {
             value,
             subnodes: vec![],
             max,
-            is_constant
+            is_constant,
         }
     }
 
-    pub fn newy_with_nodes(value: Val, nodes: Vec<Node>, max: Option<U256>, is_constant: bool) -> Self {
+    pub fn newy_with_nodes(
+        value: Val,
+        nodes: Vec<Rc<RefCell<Node>>>,
+        max: Option<U256>,
+        is_constant: bool,
+    ) -> Self {
         Node {
             value,
             subnodes: nodes,
@@ -46,7 +64,12 @@ impl Node {
         }
     }
 
-    pub fn new_with_node(value: Val, node: Node, max: Option<U256>, is_constant: bool) -> Self {
+    pub fn new_with_node(
+        value: Val,
+        node: Rc<RefCell<Node>>,
+        max: Option<U256>,
+        is_constant: bool,
+    ) -> Self {
         Node {
             value,
             subnodes: vec![node],
@@ -55,36 +78,38 @@ impl Node {
         }
     }
 
-    pub fn new_with_binary_nodes(value: Val, lnode: Node, rnode: Node, max: Option<U256>, is_constant: bool) -> Self {
+    pub fn new_with_binary_nodes(
+        value: Val,
+        lnode: Rc<RefCell<Node>>,
+        rnode: Rc<RefCell<Node>>,
+        max: Option<U256>,
+        is_constant: bool,
+    ) -> Self {
         Node {
             value,
             subnodes: vec![lnode, rnode],
             max,
-            is_constant
+            is_constant,
         }
     }
 
     pub fn loop_condition_from_copy(&self, condtions: &mut Vec<usize>) {
         match &self.value {
-            Val::ByteCode(bc) => {
-                match bc {
-                    Call(_, _, BorrowLoc, srcs, _) => {
-                        condtions.push(srcs[0]);
-                    },
-                    _ => {
-                        for subnode in self.subnodes.iter() {
-                            subnode.loop_condition_from_copy(condtions);
-                        }
+            Val::ByteCode(bc) => match bc {
+                Call(_, _, BorrowLoc, srcs, _) => {
+                    condtions.push(srcs[0]);
+                }
+                _ => {
+                    for subnode in self.subnodes.iter() {
+                        subnode.borrow().loop_condition_from_copy(condtions);
                     }
                 }
             },
-            Val::AssIgn(Bytecode::Assign(_, _, idx, assignkind)) => {
-                match assignkind {
-                    AssignKind::Copy => {
-                        condtions.push(*idx);
-                    },
-                    _ => {}
+            Val::AssIgn(Bytecode::Assign(_, _, idx, assignkind)) => match assignkind {
+                AssignKind::Copy => {
+                    condtions.push(*idx);
                 }
+                _ => {}
             },
             _ => {}
         };
@@ -96,18 +121,18 @@ impl Node {
             Val::ByteCode(bc) => {
                 if let Call(_, _, _, _, _) = bc {
                     for subnode in self.subnodes.iter() {
-                        is_const = is_const && subnode.is_const();
+                        is_const = is_const && subnode.borrow().is_const();
                     }
                 }
-            },
+            }
             Val::Const(_) => {
                 is_const = is_const && true;
-            },
+            }
             Val::ParamType(_) => {
                 is_const = is_const && false;
-            },
+            }
             Val::AssIgn(_) => {
-                is_const = is_const && self.subnodes[0].is_const();
+                is_const = is_const && self.subnodes[0].borrow().is_const();
             }
         };
         is_const
@@ -121,17 +146,17 @@ impl Node {
                     res.push_str(str.as_str());
                     res.push_str("(");
                     for subnode in self.subnodes.iter() {
-                        subnode.display(res, stbgr);
+                        subnode.borrow().display(res, stbgr);
                         res.push_str(", ");
                     }
-                    res.truncate(res.len()-2);
+                    res.truncate(res.len() - 2);
                     res.push_str(")");
                 }
-            },
+            }
             Val::Const(con) => {
                 let str = format!("{}", con).to_string();
                 res.push_str(str.as_str());
-            },
+            }
             Val::ParamType(param) => {
                 let tctx = TypeDisplayContext::WithoutEnv {
                     symbol_pool: &stbgr.symbol_pool,
@@ -139,13 +164,14 @@ impl Node {
                 };
                 let str = param.display(&tctx).to_string();
                 res.push_str(str.as_str());
-            },
-            Val::AssIgn(_) => { // TODO 简化fmt结果
+            }
+            Val::AssIgn(_) => {
+                // TODO 简化fmt结果
                 // let str = "Assign";
                 // res.push_str(str);
                 // res.push_str("(");
                 for subnode in self.subnodes.iter() {
-                    subnode.display(res, stbgr);
+                    subnode.borrow().display(res, stbgr);
                     // res.push_str(", ");
                 }
                 // res.truncate(res.len()-2);
@@ -155,10 +181,9 @@ impl Node {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct DataDepent {
-    pub data: BTreeMap<usize, Node>
+    pub data: BTreeMap<usize, Node>,
 }
 
 impl DataDepent {
@@ -177,16 +202,26 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             let function_handle_idx = FunctionHandleIndex::new(idx as u16);
             let function_handle = self.module.function_handle_at(function_handle_idx);
             let view = FunctionHandleView::new(self.module, function_handle);
-            let mut data_depent = DataDepent{ data: BTreeMap::new() };
+            let mut data_depent = DataDepent {
+                data: BTreeMap::new(),
+            };
 
             let function_defintion_idx = FunctionDefinitionIndex::new(idx as u16);
-            let _self_fid = self.module_data.function_idx_to_id.get(&function_defintion_idx).unwrap();
+            let _self_fid = self
+                .module_data
+                .function_idx_to_id
+                .get(&function_defintion_idx)
+                .unwrap();
 
             // 记录函数参数类型
             for i in 0..view.arg_count() {
                 let ty = &function.local_types[i];
                 let uint_max = get_uint_max(ty);
-                let node = Node::new(Val::ParamType(function.local_types[i].clone()), uint_max, false);
+                let node = Node::new(
+                    Val::ParamType(function.local_types[i].clone()),
+                    uint_max,
+                    false,
+                );
                 data_depent.insert_or_modify(i, node);
             }
 
@@ -194,14 +229,20 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 match code {
                     Assign(_, dst, src, _) => {
                         let node = data_depent.get(*src);
-                        let node = Node::new_with_node(Val::AssIgn(code.clone()), node.clone(), node.max, false);
+                        let node = Rc::new(RefCell::new(node));
+                        let node = Node::new_with_node(
+                            Val::AssIgn(code.clone()),
+                            node.clone(),
+                            node.borrow().max,
+                            false,
+                        );
                         data_depent.insert_or_modify(*dst, node);
                     }
                     Call(_, dsts, oper, srcs, _) => {
                         match oper {
                             // 简单的跨函数分析，如果结果来自函数调用的结果，则进入函数内部通过return指令拿到返回值的依赖
                             Function(mid, fid, _) => {
-                                let mut nodes: Vec<Node> = vec![];
+                                let mut nodes: Vec<Rc<RefCell<Node>>> = vec![];
                                 // packages通过ModuleName找到被调函数的module
                                 let mut option_stbgr = None;
                                 let mname = &self.module_names[mid.to_usize()];
@@ -228,7 +269,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                                         if let Some(Bytecode::Ret(_, rets)) = other_funtion.code.last() {
                                             for i in 0..rets.len() {
                                                 let node = other_dd.get(rets[i]);
-                                                nodes.push(node);
+                                                nodes.push(Rc::new(RefCell::new(node)));
                                             }
                                         }
                                     }
@@ -247,7 +288,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                                             if let Some(Bytecode::Ret(_, rets)) = other_funtion.code.last() {
                                                 for i in 0..rets.len() {
                                                     let node = other_dd.get(rets[i]);
-                                                    nodes.push(node);
+                                                    nodes.push(Rc::new(RefCell::new(node)));
                                                 }
                                             }
                                         }
@@ -255,7 +296,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                                 } else {
                                     for src in srcs {
                                         let node = data_depent.get(*src);
-                                        nodes.push(node);
+                                        nodes.push(Rc::new(RefCell::new(node)));
                                     }
                                 }
 
@@ -275,13 +316,13 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                                 // rnode.display(&mut res, &stbgr);
                                 // println!("{}", res);
                                 let (max, is_constant) = binary_operation_max(oper, lnode.max, rnode.max, lnode.is_constant, rnode.is_constant, ty);
-                                let node = Node::new_with_binary_nodes(Val::ByteCode(code.clone()), lnode, rnode, max, is_constant);
+                                let node = Node::new_with_binary_nodes(Val::ByteCode(code.clone()),Rc::new(RefCell::new(lnode)),Rc::new(RefCell::new(rnode)), max, is_constant);
                                 data_depent.insert_or_modify(dsts[0], node);
                             },
                             Lt | Gt | Le | Ge | Or | And | Eq | Neq => { // 二元操作，返回值为bool，参数类型不确定
                                 let lnode = data_depent.get(srcs[0]);
                                 let rnode = data_depent.get(srcs[1]);
-                                let node = Node::new_with_binary_nodes(Val::ByteCode(code.clone()), lnode, rnode, None, false);
+                                let node = Node::new_with_binary_nodes(Val::ByteCode(code.clone()),Rc::new(RefCell::new(lnode)),Rc::new(RefCell::new(rnode)), None, false);
                                 data_depent.insert_or_modify(dsts[0], node);
                             },
                             CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 => { // 一元操作
@@ -291,38 +332,40 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                                 let ty_max = get_uint_max(ty);
                                 let max = get_min_uint(node.max, ty_max);
                                 let is_constant = node.is_constant;
-                                let node = Node::new_with_node(Val::ByteCode(code.clone()), node, max, is_constant);
+                                let node = Node::new_with_node(Val::ByteCode(code.clone()),Rc::new(RefCell::new(node)), max, is_constant);
                                 data_depent.insert_or_modify(dsts[0], node);
                             },
                             Not => {
                                 let node = data_depent.get(srcs[0]);
-                                let node = Node::new_with_node(Val::ByteCode(code.clone()), node, None, false);
+                                let node = Node::new_with_node(Val::ByteCode(code.clone()),Rc::new(RefCell::new(node)), None, false);
                                 data_depent.insert_or_modify(dsts[0], node);
                             },
                             Pack(_, _, _) => { // n -> 1
                                 let mut nodes = vec![];
                                 for src in srcs {
                                     let node = data_depent.get(*src);
-                                    nodes.push(node);
+                                    nodes.push(Rc::new(RefCell::new(node)));
                                 }
                                 let node = Node::newy_with_nodes(Val::ByteCode(code.clone()), nodes, None, false);
                                 data_depent.insert_or_modify(dsts[0], node);
                             },
                             Unpack(_, _, _) => { // 1 -> n
                                 let node = data_depent.get(srcs[0]);
+                                let node_rc = Rc::new(RefCell::new(node.clone()));
+                                let children = &node.subnodes;
                                 for (i, dst) in dsts.iter().enumerate() {
                                     // 如果结构体来自函数pack操作，可以拿到pack时，每一个成员变量的约束，否则不行
                                     let ty = &function.local_types[*dst];
-                                    let max = if node.subnodes.len() == dsts.len() {
-                                        if node.subnodes[i].max.is_none() {
+                                    let max = if children.len() == dsts.len() {
+                                        if children[i].borrow().max.is_none() {
                                             get_uint_max(ty)
                                         } else {
-                                            node.subnodes[i].max
+                                            children[i].borrow().max
                                         }
                                     } else {
                                         get_uint_max(ty)
                                     };
-                                    let node = Node::new_with_node(Val::ByteCode(code.clone()), node.clone(), max, false);
+                                    let node = Node::new_with_node(Val::ByteCode(code.clone()), node_rc.clone(), max, false);
                                     data_depent.insert_or_modify(*dst, node.clone());
 
                                 }
@@ -332,7 +375,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                                 let node = data_depent.get(srcs[0]);
                                 let ty = &function.local_types[dsts[0]];
                                 let max = get_uint_max(ty);
-                                let node = Node::new_with_node(Val::ByteCode(code.clone()), node, max, false);
+                                let node = Node::new_with_node(Val::ByteCode(code.clone()),Rc::new(RefCell::new(node)), max, false);
                                 data_depent.insert_or_modify(dsts[0], node);
                             },
                             _ => {
@@ -345,7 +388,6 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                         let constant = get_uint_constant(con);
                         let node = Node::new(Val::Const(con.clone()), constant, true);
                         data_depent.insert_or_modify(*dst, node.clone());
-
                     }
                     _ => {
                         continue;
@@ -362,10 +404,14 @@ fn is_uint(ty: &Type) -> bool {
     let mut flag = false;
     if let Type::Primitive(bty) = ty {
         match bty {
-            PrimitiveType::U8 | PrimitiveType::U16 | PrimitiveType::U32 | 
-            PrimitiveType::U64 | PrimitiveType::U128 | PrimitiveType::U256 => {
+            PrimitiveType::U8
+            | PrimitiveType::U16
+            | PrimitiveType::U32
+            | PrimitiveType::U64
+            | PrimitiveType::U128
+            | PrimitiveType::U256 => {
                 flag = true;
-            },
+            }
             _ => {}
         }
     }
@@ -390,13 +436,13 @@ fn get_uint_max(ty: &Type) -> Option<U256> {
 
 fn get_uint_constant(constant: &Constant) -> Option<U256> {
     match constant {
-        Constant::U8(c) =>  Some(U256::from(*c)),
-        Constant::U16(c) =>  Some(U256::from(*c)),
-        Constant::U32(c) =>  Some(U256::from(*c)),
-        Constant::U64(c) =>  Some(U256::from(*c)),
-        Constant::U128(c) =>  Some(U256::from(*c)),
-        Constant::U256(c) =>  Some(U256::from(*c)),
-        _ =>  None,
+        Constant::U8(c) => Some(U256::from(*c)),
+        Constant::U16(c) => Some(U256::from(*c)),
+        Constant::U32(c) => Some(U256::from(*c)),
+        Constant::U64(c) => Some(U256::from(*c)),
+        Constant::U128(c) => Some(U256::from(*c)),
+        Constant::U256(c) => Some(U256::from(*c)),
+        _ => None,
     }
 }
 
@@ -406,7 +452,14 @@ fn get_min_uint(u1: Option<U256>, u2: Option<U256>) -> Option<U256> {
     Some(uint1.min(uint2))
 }
 
-fn binary_operation_max(oper: &Operation, u1: Option<U256>, u2: Option<U256>, c1: bool, c2: bool, ty: &Type) -> (Option<U256>, bool) {
+fn binary_operation_max(
+    oper: &Operation,
+    u1: Option<U256>,
+    u2: Option<U256>,
+    c1: bool,
+    c2: bool,
+    ty: &Type,
+) -> (Option<U256>, bool) {
     let uint1 = u1.expect("Missing the value of U256");
     let uint2 = u2.expect("Missing the value of U256");
     let mut is_constant = false;
@@ -422,7 +475,7 @@ fn binary_operation_max(oper: &Operation, u1: Option<U256>, u2: Option<U256>, c1
             } else {
                 res = uint2.sub(1);
             }
-        },
+        }
         Operation::Sub => {
             if c1 && c2 {
                 res = uint1.sub(uint2);
@@ -438,21 +491,26 @@ fn binary_operation_max(oper: &Operation, u1: Option<U256>, u2: Option<U256>, c1
                 res = uint1;
             }
         }
-        Operation::Add | Operation::Mul | Div | BitOr | BitAnd | Xor | Shl | Shr  => {
-            match oper {
-                Operation::Add | BitAnd | BitOr | Xor => {
-                    let (u, flag) = uint1.overflowing_add(uint2);
-                    res = if flag { get_uint_max(ty).unwrap() } else { u.min(get_uint_max(ty).unwrap()) }
-                },
-                Operation::Mul => {
-                    let (u, flag) = uint1.overflowing_mul(uint2);
-                    res = if flag { get_uint_max(ty).unwrap() } else { u.min(get_uint_max(ty).unwrap()) }
-                },
-                Div | Shr => res = uint1,
-                Shl => res = uint1.wrapping_shl(uint2.as_u32()),
-                _ => {},
+        Operation::Add | Operation::Mul | Div | BitOr | BitAnd | Xor | Shl | Shr => match oper {
+            Operation::Add | BitAnd | BitOr | Xor => {
+                let (u, flag) = uint1.overflowing_add(uint2);
+                res = if flag {
+                    get_uint_max(ty).unwrap()
+                } else {
+                    u.min(get_uint_max(ty).unwrap())
+                }
             }
-            
+            Operation::Mul => {
+                let (u, flag) = uint1.overflowing_mul(uint2);
+                res = if flag {
+                    get_uint_max(ty).unwrap()
+                } else {
+                    u.min(get_uint_max(ty).unwrap())
+                }
+            }
+            Div | Shr => res = uint1,
+            Shl => res = uint1.wrapping_shl(uint2.as_u32()),
+            _ => {}
         },
         _ => {}
     }
