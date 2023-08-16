@@ -9,7 +9,7 @@ use crate::move_ir::{
 use move_binary_format::CompiledModule;
 use move_model::symbol::{Symbol, SymbolPool};
 use move_stackless_bytecode::stackless_bytecode::{Bytecode, Operation};
-// use crate::scanner::detectors::AbstractDetector;
+use crate::scanner::detectors::AbstractDetector;
 use itertools::Itertools;
 use move_binary_format::{access::ModuleAccess, file_format::FunctionDefinitionIndex};
 use num::ToPrimitive;
@@ -81,8 +81,7 @@ impl<'a, 'b> Detector1<'a, 'b> {
         return ret;
     }
 }
-impl<'a, 'b> Detector1<'a, 'b> {
-// impl<'a, 'b> AbstractDetector<'a, 'b> for Detector1<'a, 'b> {
+impl<'a, 'b> AbstractDetector<'a, 'b> for Detector1<'a, 'b> {
     fn new(packages: &Packages<'a, 'b>) -> Self {
         Self {
             packages,
