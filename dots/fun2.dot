@@ -1,7 +1,0 @@
-digraph {
-    0 [ label = "[Block 0 - X]\l" shape=box]
-    1 [ label = "[Block 1 - X]\l" shape=box]
-    2 [ label = "[Block 2 - offset 0..=4]\l  0: $t0 := 2\l  1: $t1 := 3\l  2: $t2 := unchecked_return::fun1($t0, $t1)\l  3: destroy($t2)\l  4: return ()\l" shape=box]
-    0 -> 2 [ label = "" ]
-    2 -> 1 [ label = "" ]
-}

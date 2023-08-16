@@ -101,7 +101,6 @@ pub struct ModuleInfo {
     pub function_count: HashMap<FunctionType, usize>,
     pub constant_count: usize,
     pub detectors: HashMap<DetectorType, Vec<String>>,
-    pub functions: HashMap<FunctionName, Vec<DetectorType>>,
 }
 impl ModuleInfo {
     pub fn new(
@@ -109,14 +108,12 @@ impl ModuleInfo {
         function_count: HashMap<FunctionType, usize>,
         constant_count: usize,
         detectors: HashMap<DetectorType, Vec<String>>,
-        functions: HashMap<FunctionName, Vec<DetectorType>>,
     ) -> Self {
         Self {
             time,
             function_count,
             constant_count,
             detectors,
-            functions,
         }
     }
 
@@ -135,7 +132,7 @@ impl ModuleInfo {
             (DetectorType::UnusedConstant, Vec::<String>::new()),
             (DetectorType::UnusedPrivateFunctions, Vec::<String>::new()),
         ]);
-        return Self::new(0, function_count, 0, detectors, HashMap::new());
+        return Self::new(0, function_count, 0, detectors);
     }
 
     // 更新
@@ -150,16 +147,6 @@ impl ModuleInfo {
             .unwrap()
             .extend(value)
     }
-    pub fn init_functions(&mut self, func_name: FunctionName){
-        if !self.functions.contains_key(&func_name) {
-            self.functions.insert(func_name, Vec::<DetectorType>::new());
-        }
-    }
-
-    pub fn update_functions(&mut self, func_name: FunctionName,detector_type: DetectorType) {
-        self.functions.get_mut(&func_name).unwrap().push(detector_type);
-    }
-
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -187,15 +174,15 @@ impl PrettyResult {
 }
 impl std::fmt::Display for PrettyResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "\nsuccess: \x1B[32m{:<6}\x1B[0m failed: \x1B[31m{:<6}\x1B[0m pass: \x1B[32m{:<6}\x1B[0m wrong: \x1B[31m{:<6}\x1B[0m time: \x1B[34m{}\x1B[0m us\n",
-            self.modules_count.get(&Status::Success).unwrap(),
-            self.modules_count.get(&Status::Failed).unwrap(),
-            self.modules_count.get(&Status::Success).unwrap()+self.modules_count.get(&Status::Failed).unwrap()-self.modules.len(),
-            self.modules.len(),
-            self.total_time
-        )?;
+        // writeln!(
+        //     f,
+        //     "\nsuccess: \x1B[32m{:<6}\x1B[0m failed: \x1B[31m{:<6}\x1B[0m pass: \x1B[32m{:<6}\x1B[0m wrong: \x1B[31m{:<6}\x1B[0m time: \x1B[34m{}\x1B[0m us\n",
+        //     self.modules_count.get(&Status::Success).unwrap(),
+        //     self.modules_count.get(&Status::Failed).unwrap(),
+        //     self.modules_count.get(&Status::Success).unwrap()+self.modules_count.get(&Status::Failed).unwrap()-self.modules.len(),
+        //     self.modules.len(),
+        //     self.total_time
+        // )?;
 
         for (module_index,(module_name,detectors_result))in self.modules.clone().iter().enumerate(){
             writeln!(f,"no: {}",module_index)?;

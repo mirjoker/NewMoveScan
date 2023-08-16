@@ -1,7 +1,0 @@
-digraph {
-    0 [ label = "[Block 0 - X]\l" shape=box]
-    1 [ label = "[Block 1 - X]\l" shape=box]
-    2 [ label = "[Block 2 - offset 0..=3]\l  0: $t2 := move($t0)\l  1: $t3 := move($t1)\l  2: $t4 := +($t2, $t3)\l  3: return $t4\l" shape=box]
-    0 -> 2 [ label = "" ]
-    2 -> 1 [ label = "" ]
-}

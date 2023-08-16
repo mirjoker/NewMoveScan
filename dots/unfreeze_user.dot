@@ -1,7 +1,0 @@
-digraph {
-    0 [ label = "[Block 0 - X]\l" shape=box]
-    1 [ label = "[Block 1 - X]\l" shape=box]
-    2 [ label = "[Block 2 - offset 0..=14]\l  0: $t4 := move($t0)\l  1: $t5 := signer::address_of($t4)\l  2: $t2 := $t5\l  3: $t6 := copy($t2)\l  4: DemoCoin::is_admin($t6)\l  5: $t7 := move($t2)\l  6: DemoCoin::have_coin_capabilities($t7)\l  7: $t8 := 0x123\l  8: $t9 := borrow_global<DemoCoin::CoinCapabilities>($t8)\l  9: $t10 := borrow_field<DemoCoin::CoinCapabilities>.freeze_cap($t9)\l 10: $t3 := $t10\l 11: $t11 := move($t1)\l 12: $t12 := move($t3)\l 13: coin::unfreeze_coin_store<DemoCoin::APD>($t11, $t12)\l 14: return ()\l" shape=box]
-    0 -> 2 [ label = "" ]
-    2 -> 1 [ label = "" ]
-}

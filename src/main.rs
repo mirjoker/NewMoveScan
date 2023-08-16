@@ -8,7 +8,6 @@ use clap::Parser;
 
 fn main() {
     let cli = Cli::parse();
-
     match &cli.command {
         Some(SubCommands::Printer) => {
             // todo: 代码优化

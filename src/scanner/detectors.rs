@@ -3,11 +3,11 @@ use crate::{
     cli::parser::*,
     move_ir::generate_bytecode::StacklessBytecodeGenerator,
     scanner::{
-        detects::{
-            detect1::detect_unchecked_return, detect2::detect_overflow,
-            detect3::detect_precision_loss, detect4::detect_infinite_loop,
-            detect5::detect_unused_constants, detect6::detect_unused_private_functions,
-            detect7::detect_unnecessary_type_conversion, detect8::detect_unnecessary_bool_judgment,
+        detector::{
+            detector2::detect_overflow,
+            detector3::detect_precision_loss, detector4::detect_infinite_loop,
+            detector5::detect_unused_constants, detector6::detect_unused_private_functions,
+            detector7::detect_unnecessary_type_conversion, detector8::detect_unnecessary_bool_judgment,
         },
         result::{DetectorType, FunctionType, ModuleInfo, PrettyResult, Result, Status},
     },
@@ -18,16 +18,26 @@ use move_binary_format::{access::ModuleAccess, file_format::FunctionDefinitionIn
 use num::ToPrimitive;
 use std::{fs, io::Write, path::PathBuf, time::Instant};
 
-pub struct Detector {
-    pub args: Args,
-    pub result: Result,
+pub trait AbstractDetector<'a, 'b> {
+    
+    fn new(packages:&Packages<'a, 'b>) -> Self
+    where
+        Self: Sized;
+    fn run(&self);
 }
 
-impl Detector {
+pub struct Detectors<'a,'b> {
+    pub args: Args,
+    pub result: Result,
+    pub detectors: Vec<Box<dyn AbstractDetector<'a,'b>>>
+}
+
+impl<'a, 'b> Detectors<'a,'b> {
     pub fn new(args: Args) -> Self {
         Self {
             args,
             result: Result::empty(),
+            detectors: Vec::new()
         }
     }
     pub fn get_function_name(&self, idx: usize, stbgr: &StacklessBytecodeGenerator) -> String {
@@ -123,46 +133,34 @@ impl Detector {
                 };
                 let func_name = self.get_function_name(idx, stbgr);
 
-                // 初始化 functions
-                module_info.init_functions(func_name.clone());
 
-                // 更新 detectors 和 functions
-                let mut unchecked_return_func_list = detect_unchecked_return(function, &stbgr.symbol_pool, idx, stbgr.module);
-                if !unchecked_return_func_list.is_empty() {
-                    // 先排序，再去重。Tips：dedup 用于去除连续的重复元素
-                    unchecked_return_func_list.sort();
-                    unchecked_return_func_list.dedup();
-                    let func_str = format!("{}({})", func_name.clone(), unchecked_return_func_list.into_iter().join(","));
-                    module_info.update_detectors(DetectorType::UncheckedReturn, func_str);
-                    module_info.update_functions(func_name.clone(), DetectorType::UncheckedReturn);
-                }
+                // // 更新 detectors
+                // let mut unchecked_return_func_list = detect_unchecked_return(function, &stbgr.symbol_pool, idx, stbgr.module);
+                // if !unchecked_return_func_list.is_empty() {
+                //     // 先排序，再去重。Tips：dedup 用于去除连续的重复元素
+                //     unchecked_return_func_list.sort();
+                //     unchecked_return_func_list.dedup();
+                //     let func_str = format!("{}({})", func_name.clone(), unchecked_return_func_list.into_iter().join(","));
+                //     module_info.update_detectors(DetectorType::UncheckedReturn, func_str);
+                // }
                 if detect_overflow(&packages, &stbgr, idx) {
                     module_info.update_detectors(DetectorType::Overflow, func_name.clone());
-                    module_info.update_functions(func_name.clone(), DetectorType::Overflow);
                 }
                 if detect_precision_loss(function, &stbgr.symbol_pool) {
                     module_info.update_detectors(DetectorType::PrecisionLoss, func_name.clone());
-                    module_info.update_functions(func_name.clone(), DetectorType::PrecisionLoss);
                 }
                 if detect_infinite_loop(&packages, &stbgr, idx) {
                     module_info.update_detectors(DetectorType::InfiniteLoop, func_name.clone());
-                    module_info.update_functions(func_name.clone(), DetectorType::InfiniteLoop);
                 }
                 if detect_unnecessary_type_conversion(function, &function.local_types) {
                     module_info.update_detectors(
                         DetectorType::UnnecessaryTypeConversion,
                         func_name.clone(),
                     );
-                    module_info.update_functions(
-                        func_name.clone(),
-                        DetectorType::UnnecessaryTypeConversion,
-                    );
                 }
                 if detect_unnecessary_bool_judgment(function, &function.local_types) {
                     module_info
                         .update_detectors(DetectorType::UnnecessaryBoolJudgment, func_name.clone());
-                    module_info
-                        .update_functions(func_name.clone(), DetectorType::UnnecessaryBoolJudgment);
                 }
             }
             let unused_private_functions = detect_unused_private_functions(&stbgr);
@@ -170,8 +168,6 @@ impl Detector {
                 .iter()
                 .map(|func| {
                     let func_name = func.symbol().display(&stbgr.symbol_pool).to_string();
-                    module_info
-                        .update_functions(func_name.clone(), DetectorType::UnusedPrivateFunctions);
                     return func_name;
                 })
                 .collect_vec();

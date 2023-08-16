@@ -1,4 +1,4 @@
-use MoveScanner::scanner::detects::detect1;
+use MoveScanner::scanner::detector::detect1;
 #[test]
 fn it_adds_two() {
     println!("hello")
