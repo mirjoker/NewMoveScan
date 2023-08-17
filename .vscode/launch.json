@@ -39,7 +39,7 @@
                 }
             },
             // "args": ["-p", "./res/examples_mv/aptos/DemoCoin.mv"],
-            "args": ["-p", "/home/wlq/Project/MoveBit/MoveScannerTest/OpenSource/res/repo/Aptos/aptos-token-vesting/build/token-vesting/bytecode_modules"],
+            "args": ["-p", "/home/wlq/Project/MoveBit/MoveScanner/res/examples_mv/aptos"],
             "cwd": "${workspaceFolder}"
         },
         {
