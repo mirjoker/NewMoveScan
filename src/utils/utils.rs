@@ -1,8 +1,10 @@
-use std::{fs, path::PathBuf, io::{BufReader, Read}};
+use std::{fs, path::PathBuf};
 
-use move_binary_format::{CompiledModule, file_format::Visibility};
-use move_model::{model::ModuleEnv, ty::{self, *}};
-
+use move_binary_format::file_format::Visibility;
+use move_model::{
+    model::ModuleEnv,
+    ty::{self, *},
+};
 
 // 依赖的 module 的 address
 const DEPADDRESSES: [&str; 2] = ["0x1::", "0x3::"];
@@ -44,16 +46,7 @@ pub fn is_dep_module(module_env: &ModuleEnv) -> bool {
             break;
         }
     }
-    return is_dep
-}
-
-pub fn compile_module(filename: PathBuf) -> Option<CompiledModule> {
-    let f = fs::File::open(filename).unwrap();
-    let mut reader = BufReader::new(f);
-    let mut buffer = Vec::new();
-    reader.read_to_end(&mut buffer).unwrap();
-    let cm = CompiledModule::deserialize(&buffer);
-    cm.ok()
+    return is_dep;
 }
 
 pub fn visibility_str(visibility: &Visibility) -> &str {
@@ -66,55 +59,53 @@ pub fn visibility_str(visibility: &Visibility) -> &str {
 
 pub fn display_type(ty: &Type) {
     match ty {
-        ty::Type::Primitive(base_ty) => {
-            match base_ty {
-                PrimitiveType::Bool => {
-                    println!("{}", "Bool"); 
-                }
-                PrimitiveType::U8 => {
-                    println!("{}", "U8"); 
-                }
-                PrimitiveType::U16 => {
-                    println!("{}", "U16"); 
-                }
-                PrimitiveType::U32 => {
-                    println!("{}", "Bool"); 
-                }
-                PrimitiveType::U64 => {
-                    println!("{}", "U64"); 
-                }
-                PrimitiveType::U128 => {
-                    println!("{}", "U128"); 
-                }
-                PrimitiveType::U256 => {
-                    println!("{}", "U256"); 
-                }
-                PrimitiveType::Address => {
-                    println!("{}", "Address"); 
-                }
-                PrimitiveType::Signer => {
-                    println!("{}", "Signer"); 
-                }
-                _ => {
-                    println!("{}", "Else"); 
-                }
+        ty::Type::Primitive(base_ty) => match base_ty {
+            PrimitiveType::Bool => {
+                println!("{}", "Bool");
+            }
+            PrimitiveType::U8 => {
+                println!("{}", "U8");
+            }
+            PrimitiveType::U16 => {
+                println!("{}", "U16");
+            }
+            PrimitiveType::U32 => {
+                println!("{}", "Bool");
+            }
+            PrimitiveType::U64 => {
+                println!("{}", "U64");
+            }
+            PrimitiveType::U128 => {
+                println!("{}", "U128");
+            }
+            PrimitiveType::U256 => {
+                println!("{}", "U256");
+            }
+            PrimitiveType::Address => {
+                println!("{}", "Address");
+            }
+            PrimitiveType::Signer => {
+                println!("{}", "Signer");
+            }
+            _ => {
+                println!("{}", "Else");
             }
         },
         ty::Type::Tuple(_) => {
             println!("{}", "Tuple");
-        },
+        }
         ty::Type::Vector(_) => {
             println!("{}", "Vector");
-        },
+        }
         ty::Type::Struct(_, _, _) => {
             println!("{}", "Struct");
-        },
+        }
         ty::Type::TypeParameter(_) => {
             println!("{}", "TypeParameter");
-        },
+        }
         ty::Type::Reference(flag, _) => {
             println!("{}, {}", flag, "Reference");
-        },
+        }
         _ => {
             println!("{}", "Else");
         }
@@ -123,8 +114,7 @@ pub fn display_type(ty: &Type) {
 
 use anyhow::anyhow;
 use move_stackless_bytecode::{
-    function_target_pipeline::FunctionTargetPipeline,
-    usage_analysis::UsageProcessor,
+    function_target_pipeline::FunctionTargetPipeline, usage_analysis::UsageProcessor,
 };
 // IR 优化
 pub fn get_tested_transformation_pipeline(
@@ -148,7 +138,8 @@ pub fn format_vec_u8(vec: &[u8]) -> String {
     let mut res = "".to_string();
     let n = vec.len();
     match n {
-        8 => { // U64
+        8 => {
+            // U64
             let mut num: u64 = 0;
             let mut base: u64 = 1;
             for (i, v) in vec.iter().enumerate() {
@@ -156,11 +147,11 @@ pub fn format_vec_u8(vec: &[u8]) -> String {
                     base = base << 8;
                 }
                 num = num + u64::from(*v) * base;
-
             }
             res = num.to_string();
-        },
-        16 => { // U128 or Address
+        }
+        16 => {
+            // U128 or Address
             let mut num: u128 = 0;
             let mut base: u128 = 1;
             for (i, v) in vec.iter().enumerate() {
@@ -172,7 +163,7 @@ pub fn format_vec_u8(vec: &[u8]) -> String {
             let hex_string = hex::encode(vec);
             res = hex_string + "/";
             res = res + num.to_string().as_str();
-        },
+        }
         _ => {
             for v in vec.iter() {
                 let ch = std::char::from_u32(*v as u32).expect("Invalid ASCII value");

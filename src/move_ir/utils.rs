@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use std::{collections::BTreeMap, fmt::{Write}};
+use std::{collections::BTreeMap, fmt::Write};
 
 use crate::{move_ir::generate_bytecode::StacklessBytecodeGenerator, utils::utils::DotWeight};
 use move_binary_format::{
@@ -475,4 +475,17 @@ pub fn get_def_bytecode(function: &FunctionInfo, sid: usize, code_offset: usize)
             &function.code[tid[0]]
         }
     }
+}
+
+pub fn get_function_name(idx: usize, stbgr: &StacklessBytecodeGenerator) -> String {
+    let func_name = stbgr
+        .module
+        .identifier_at(
+            stbgr
+                .module
+                .function_handle_at(stbgr.module.function_defs[idx].function)
+                .name,
+        )
+        .to_string();
+    return func_name;
 }

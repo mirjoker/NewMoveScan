@@ -1,30 +1,44 @@
-use std::collections::BTreeMap;
-use move_model::{model::FunId};
+use std::{path::PathBuf,collections::BTreeMap};
+use move_binary_format::CompiledModule;
+use move_model::model::FunId;
 use super::generate_bytecode::{StacklessBytecodeGenerator, FunctionInfo};
+use crate::utils::utils;
+use std::{fs, io::{BufReader, Read}};
 
-
-pub struct Packages<'a, 'b>{
-    packages: BTreeMap<String, &'b StacklessBytecodeGenerator<'a>>,
+pub struct Packages<'a>{
+    packages: BTreeMap<String, StacklessBytecodeGenerator<'a>>,
+    // todo 新增 Status，其中维护构建失败和成功的数量
 }
 
-impl<'a, 'b> Packages<'a, 'b> {
-    pub fn new() -> Self {
+impl<'a> Packages<'a> {
+    pub fn new(cms: &'a Vec<CompiledModule>) -> Self {
+        // 根据cms构建StacklessBytecodeGenerator，并进行IR转换、cfg构建、call_gragh构建、data_dependency分析
+        let mut stbgrs = Vec::new();
+        for cm in cms.iter() {
+            let mut stbgr = StacklessBytecodeGenerator::new(&cm);
+            stbgr.generate_function();
+            stbgr.get_control_flow_graph();
+            stbgr.build_call_graph();
+            stbgr.get_data_dependency(&mut stbgrs);
+            stbgrs.push(stbgr);
+        }
+        // package构建
+        let mut packages = BTreeMap::new();
+        for stbgr in stbgrs {
+            let mname = stbgr.module_data.name.clone();
+            let mname = mname.display(&stbgr.symbol_pool).to_string();
+            packages.insert(mname, stbgr);
+        }
         Packages { 
-            packages: BTreeMap::new(),
+            packages: packages,
         }
     }
 
-    pub fn insert_stbgr(&mut self, stbgr: &'b StacklessBytecodeGenerator<'a>) {
-        let mname = stbgr.module_data.name.clone();
-        let mname = mname.display(&stbgr.symbol_pool).to_string();
-        self.packages.insert(mname, stbgr);
-    }
-
-    pub fn get_all_stbgr(&self) -> &BTreeMap<String, &'b StacklessBytecodeGenerator<'a>> {
+    pub fn get_all_stbgr(&self) -> &BTreeMap<String, StacklessBytecodeGenerator<'a>> {
         &self.packages
     }
 
-    pub fn get_stbgr_by_mname(&self, mname: String) -> Option<&&StacklessBytecodeGenerator<'_>> {
+    pub fn get_stbgr_by_mname(&self, mname: String) -> Option<&StacklessBytecodeGenerator<'_>> {
         self.packages.get(&mname)
     }
 
@@ -40,4 +54,31 @@ impl<'a, 'b> Packages<'a, 'b> {
         }
         &stbgr.functions[idx as usize]
     }
+}
+pub fn compile_module(filename: PathBuf) -> Option<CompiledModule> {
+    let f = fs::File::open(filename).unwrap();
+    let mut reader = BufReader::new(f);
+    let mut buffer = Vec::new();
+    reader.read_to_end(&mut buffer).unwrap();
+    let cm = CompiledModule::deserialize(&buffer);
+    cm.ok()
+}
+
+pub fn build_compiled_modules(path:&String) -> Vec<CompiledModule> {
+    let dir = PathBuf::from(&path);
+    // 输入路径遍历
+    let mut paths = Vec::new();
+    utils::visit_dirs(&dir, &mut paths, false);
+    // 输入文件解析(反序列化成CompiledModule)
+    let mut cms = Vec::new();
+    for filename in paths {
+        // println!("Deserializing {:?}...", filename);
+        if let Some(cm) = compile_module(filename.clone()) {
+            cms.push(cm);
+        } else {
+            // todo 加红！
+            println!("Fail to deserialize {:?} !!!", filename);
+        }
+    }
+    cms
 }

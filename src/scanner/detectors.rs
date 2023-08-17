@@ -1,56 +1,61 @@
-use crate::move_ir::packages::Packages;
 use crate::{
     cli::parser::*,
-    move_ir::generate_bytecode::StacklessBytecodeGenerator,
+    move_ir::packages::{build_compiled_modules, Packages},
     scanner::{
-        detector::{
-            detector2::detect_overflow,
-            detector3::detect_precision_loss, detector4::detect_infinite_loop,
-            detector5::detect_unused_constants, detector6::detect_unused_private_functions,
-            detector7::detect_unnecessary_type_conversion, detector8::detect_unnecessary_bool_judgment,
+        detects::{
+            detect1::Detector1, detect2::Detector2, detect3::Detector3, detect4::Detector4,
+            detect5::Detector5, detect6::Detector6, detect7::Detector7, detect8::Detector8,
         },
-        result::{DetectorType, FunctionType, ModuleInfo, PrettyResult, Result, Status},
+        result::*,
     },
-    utils::utils::{self, compile_module},
 };
-use itertools::Itertools;
 use move_binary_format::{access::ModuleAccess, file_format::FunctionDefinitionIndex};
 use num::ToPrimitive;
-use std::{fs, io::Write, path::PathBuf, time::Instant};
+use std::{fs, io::Write, time::Instant};
 
-pub trait AbstractDetector<'a, 'b> {
-    
-    fn new(packages:&Packages<'a, 'b>) -> Self
+pub trait AbstractDetector<'a> {
+    fn new(packages: &'a Packages<'a>) -> Self
     where
         Self: Sized;
-    fn run(&self);
+    fn run(&mut self) -> &DetectContent;
 }
 
-pub struct Detectors<'a,'b> {
+pub struct Detectors {
     pub args: Args,
     pub result: Result,
-    pub detectors: Vec<Box<dyn AbstractDetector<'a,'b>>>
 }
 
-impl<'a, 'b> Detectors<'a,'b> {
+impl Detectors {
     pub fn new(args: Args) -> Self {
         Self {
             args,
             result: Result::empty(),
-            detectors: Vec::new()
         }
     }
-    pub fn get_function_name(&self, idx: usize, stbgr: &StacklessBytecodeGenerator) -> String {
-        let func_name = stbgr
-            .module
-            .identifier_at(
-                stbgr
-                    .module
-                    .function_handle_at(stbgr.module.function_defs[idx].function)
-                    .name,
-            )
-            .to_string();
-        return func_name;
+
+    pub fn run(&mut self) {
+        let clock = Instant::now();
+        // package构建
+        let cms = build_compiled_modules(&self.args.path);
+        let packages = Packages::new(&cms);
+        self.init_result(&packages);
+        let mut detectors: Vec<Box<dyn AbstractDetector>> = vec![
+            Box::new(Detector1::new(&packages)),
+            Box::new(Detector2::new(&packages)),
+            Box::new(Detector3::new(&packages)),
+            Box::new(Detector4::new(&packages)),
+            Box::new(Detector5::new(&packages)),
+            Box::new(Detector6::new(&packages)),
+            Box::new(Detector7::new(&packages)),
+            Box::new(Detector8::new(&packages)),
+        ];
+
+        for detector in detectors.iter_mut() {
+            let detect_content = detector.run();
+            self.merge_result(detect_content);
+        }
+
+        self.complete_result(clock);
     }
 
     pub fn output_result(&self) {
@@ -63,7 +68,7 @@ impl<'a, 'b> Detectors<'a,'b> {
                 .expect("Failed to write to json file");
         }
         if self.args.none {
-            return
+            return;
         }
         if self.args.json {
             let pretty_json_result = serde_json::to_string(&pretty_result).ok().unwrap();
@@ -75,44 +80,9 @@ impl<'a, 'b> Detectors<'a,'b> {
         }
     }
 
-    pub fn run(&mut self) {
-        // 开始检测
-        let time_start = Instant::now();
-        let dir = PathBuf::from(&self.args.path);
-        // 输入路径遍历
-        let mut paths = Vec::new();
-        utils::visit_dirs(&dir, &mut paths, false);
-        // 输入文件解析(反序列化成CompiledModule)
-        let mut cms = Vec::new();
-        for filename in paths {
-            // println!("Deserializing {:?}...", filename);
-            if let Some(cm) = compile_module(filename.clone()) {
-                *self.result.modules_count.get_mut(&Status::Success).unwrap() += 1;
-                cms.push(cm);
-            } else {
-                println!("Fail to deserialize {:?} !!!", filename);
-                *self.result.modules_count.get_mut(&Status::Failed).unwrap() += 1;
-            }
-        }
-        // 根据cms构建StacklessBytecodeGenerator，并进行IR转换、cfg构建、call_gragh构建、data_dependency分析
-        let mut stbgrs = Vec::new();
-        for cm in cms.iter() {
-            let mut stbgr = StacklessBytecodeGenerator::new(&cm);
-            stbgr.generate_function();
-            stbgr.get_control_flow_graph();
-            stbgr.build_call_graph();
-            stbgr.get_data_dependency(&mut stbgrs);
-            stbgrs.push(stbgr);
-        }
-        // package构建
-        let mut packages = Packages::new();
-        for stbgr in stbgrs.iter() {
-            packages.insert_stbgr(stbgr);
-        }
-
-        // 遍历packages中的stbgr
-        for (mname, &stbgr) in packages.get_all_stbgr().iter() {
-            let module_time_start = Instant::now();
+    // 为每个 module 生成 ModuleInfo，计算其中的 constant_count 和 function_count
+    fn init_result(&mut self, packages: &Packages) {
+        for (mname, &ref stbgr) in packages.get_all_stbgr().iter() {
             let mut module_info = ModuleInfo::empty();
             module_info.constant_count = stbgr.module.constant_pool.len();
             *module_info
@@ -120,7 +90,7 @@ impl<'a, 'b> Detectors<'a,'b> {
                 .get_mut(&FunctionType::All)
                 .unwrap() = stbgr.functions.len();
             // 遍历stbgr中的functions
-            for (idx, function) in stbgr.functions.iter().enumerate() {
+            for (idx, _function) in stbgr.functions.iter().enumerate() {
                 let func_define = stbgr
                     .module
                     .function_def_at(FunctionDefinitionIndex::new(idx as u16));
@@ -129,63 +99,50 @@ impl<'a, 'b> Detectors<'a,'b> {
                         .function_count
                         .get_mut(&FunctionType::Native)
                         .unwrap() += 1;
-                    continue;
                 };
-                let func_name = self.get_function_name(idx, stbgr);
-
-
-                // // 更新 detectors
-                // let mut unchecked_return_func_list = detect_unchecked_return(function, &stbgr.symbol_pool, idx, stbgr.module);
-                // if !unchecked_return_func_list.is_empty() {
-                //     // 先排序，再去重。Tips：dedup 用于去除连续的重复元素
-                //     unchecked_return_func_list.sort();
-                //     unchecked_return_func_list.dedup();
-                //     let func_str = format!("{}({})", func_name.clone(), unchecked_return_func_list.into_iter().join(","));
-                //     module_info.update_detectors(DetectorType::UncheckedReturn, func_str);
-                // }
-                if detect_overflow(&packages, &stbgr, idx) {
-                    module_info.update_detectors(DetectorType::Overflow, func_name.clone());
-                }
-                if detect_precision_loss(function, &stbgr.symbol_pool) {
-                    module_info.update_detectors(DetectorType::PrecisionLoss, func_name.clone());
-                }
-                if detect_infinite_loop(&packages, &stbgr, idx) {
-                    module_info.update_detectors(DetectorType::InfiniteLoop, func_name.clone());
-                }
-                if detect_unnecessary_type_conversion(function, &function.local_types) {
-                    module_info.update_detectors(
-                        DetectorType::UnnecessaryTypeConversion,
-                        func_name.clone(),
-                    );
-                }
-                if detect_unnecessary_bool_judgment(function, &function.local_types) {
-                    module_info
-                        .update_detectors(DetectorType::UnnecessaryBoolJudgment, func_name.clone());
-                }
             }
-            let unused_private_functions = detect_unused_private_functions(&stbgr);
-            let unused_private_function_names = unused_private_functions
-                .iter()
-                .map(|func| {
-                    let func_name = func.symbol().display(&stbgr.symbol_pool).to_string();
-                    return func_name;
-                })
-                .collect_vec();
-
-            module_info.updates_detectors(
-                DetectorType::UnusedConstant,
-                detect_unused_constants(&stbgr)
-                    .iter()
-                    .map(|x| format!("{:?}", x))
-                    .collect_vec(),
-            );
-            module_info.updates_detectors(
-                DetectorType::UnusedPrivateFunctions,
-                unused_private_function_names,
-            );
-            module_info.time = module_time_start.elapsed().as_micros().to_usize().unwrap();
             self.result.add_module(mname.to_string(), module_info);
         }
-        self.result.total_time = time_start.elapsed().as_micros().to_usize().unwrap();
+    }
+
+    // 将每个 detector 检测结果同步到 result 中
+    fn merge_result(&mut self, detect_content: &DetectContent) {
+        let kind = detect_content.kind.clone();
+        for (module_name, detect_res) in detect_content.result.iter() {
+            detect_res.iter().for_each(|r| {
+                self.result
+                    .modules
+                    .get_mut(module_name)
+                    .unwrap()
+                    .detectors
+                    .get_mut(&kind)
+                    .unwrap()
+                    .push(r.to_string());
+            })
+        }
+    }
+
+    // 收尾工作，生成执行总耗时、pass 和 wrong 的 module 数量
+    fn complete_result(&mut self, clock: Instant) {
+        self.result.total_time = clock.elapsed().as_micros().to_usize().unwrap();
+        let module_count = self.result.modules.len();
+        let mut wrong_module_count = 0;
+        for (_module_name, module_info) in self.result.modules.iter() {
+            let mut pass = true;
+            for (_detector_type, values) in module_info.detectors.iter() {
+                if !values.is_empty() {
+                    pass = false;
+                }
+            }
+            if !pass {
+                wrong_module_count += 1;
+            }
+        }
+        self.result
+            .modules_status
+            .insert(Status::Pass, module_count - wrong_module_count);
+        self.result
+            .modules_status
+            .insert(Status::Wrong, wrong_module_count);
     }
 }
