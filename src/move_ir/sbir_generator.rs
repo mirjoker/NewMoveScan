@@ -11,7 +11,8 @@ use std::{
     vec,
     fs,
 };
-use crate::utils::utils::{self, compile_module};
+use crate::utils::utils;
+use crate::move_ir::packages::compile_module;
 
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use move_model::{ast::ModuleName, model::GlobalEnv, ty::Type};

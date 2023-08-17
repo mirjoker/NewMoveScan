@@ -1,4 +1,4 @@
-pub mod detects;
-pub mod detector;
 pub mod printer;
+pub mod detectors;
+pub mod detects;
 pub mod result;

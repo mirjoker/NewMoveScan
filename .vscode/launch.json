@@ -38,7 +38,8 @@
                     "kind": "bin"
                 }
             },
-            "args": ["-p", "./res/examples_mv/aptos/DemoCoin.mv"],
+            // "args": ["-p", "./res/examples_mv/aptos/DemoCoin.mv"],
+            "args": ["-p", "/home/wlq/Project/MoveBit/MoveScanner/res/examples_mv/aptos"],
             "cwd": "${workspaceFolder}"
         },
         {

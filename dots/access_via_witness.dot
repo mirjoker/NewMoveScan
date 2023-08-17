@@ -1,7 +1,0 @@
-digraph {
-    0 [ label = "[Block 0 - X]\l" shape=box]
-    1 [ label = "[Block 1 - X]\l" shape=box]
-    2 [ label = "[Block 2 - offset 0..=8]\l  0: $t2 := move($t0)\l  1: $t3 := unpack witness::Witness($t2)\l  2: destroy($t3)\l  3: $t4 := vector::empty<u64>()\l  4: $t1 := $t4\l  5: $t5 := borrow_local($t1)\l  6: $t6 := 5\l  7: vector::push_back<u64>($t5, $t6)\l  8: return ()\l" shape=box]
-    0 -> 2 [ label = "" ]
-    2 -> 1 [ label = "" ]
-}

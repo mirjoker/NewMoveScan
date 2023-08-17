@@ -1,12 +1,10 @@
 use crate::cli::parser::Args;
-use crate::move_ir::packages::Packages;
 use crate::{
     cli::parser::*,
     move_ir::{
         control_flow_graph::generate_cfg_in_dot_format,
-        generate_bytecode::StacklessBytecodeGenerator,
+        packages::{build_compiled_modules, Packages},
     },
-    utils::utils::{self, compile_module},
 };
 use move_binary_format::access::ModuleAccess;
 use petgraph::dot::Dot;
@@ -24,40 +22,12 @@ impl Printer {
             // result: Result::empty(),
         }
     }
-    pub fn run(&mut self) {
-        // 开始检测
-        let dir = PathBuf::from(&self.args.path);
-        // 输入路径遍历
-        let mut paths = Vec::new();
-        utils::visit_dirs(&dir, &mut paths, false);
-        // 输入文件解析(反序列化成CompiledModule)
-        let mut cms = Vec::new();
-        for filename in paths {
-            // println!("Deserializing {:?}...", filename);
-            if let Some(cm) = compile_module(filename.clone()) {
-                cms.push(cm);
-            } else {
-                println!("Fail to deserialize {:?} !!!", filename);
-            }
-        }
-        // 根据cms构建StacklessBytecodeGenerator，并进行IR转换、cfg构建、call_gragh构建、data_dependency分析
-        let mut stbgrs = Vec::new();
-        for cm in cms.iter() {
-            let mut stbgr = StacklessBytecodeGenerator::new(&cm);
-            stbgr.generate_function();
-            stbgr.get_control_flow_graph();
-            stbgr.build_call_graph();
-            stbgr.get_data_dependency(&mut stbgrs);
-            stbgrs.push(stbgr);
-        }
-        // package构建
-        let mut packages = Packages::new();
-        for stbgr in stbgrs.iter() {
-            packages.insert_stbgr(stbgr);
-        }
 
+    pub fn run(&mut self) {
+        let cms = build_compiled_modules(&self.args.path);
+        let packages = Packages::new(&cms);
         // 遍历packages中的stbgr
-        for (mname, &stbgr) in packages.get_all_stbgr().iter() {
+        for (mname, &ref stbgr) in packages.get_all_stbgr().iter() {
             match self.args.ir_type {
                 Some(IR::CFG) => {
                     let dot_dir = "./dots";

@@ -1,7 +1,0 @@
-digraph {
-    0 [ label = "[Block 0 - X]\l" shape=box]
-    1 [ label = "[Block 1 - X]\l" shape=box]
-    2 [ label = "[Block 2 - offset 0..=34]\l  0: $t6 := copy($t0)\l  1: $t7 := signer::address_of($t6)\l  2: $t1 := $t7\l  3: $t8 := copy($t1)\l  4: DemoCoin::is_admin($t8)\l  5: $t9 := copy($t1)\l  6: DemoCoin::not_have_coin_capabilities($t9)\l  7: $t10 := copy($t0)\l  8: $t11 := [65, 112, 116, 111, 112, 97, 100, 32, 67, 111, 105, 110]\l  9: $t12 := string::utf8($t11)\l 10: $t13 := [65, 80, 68]\l 11: $t14 := string::utf8($t13)\l 12: $t15 := 8\l 13: $t16 := true\l 14: ($t17, $t18, $t19) := coin::initialize<DemoCoin::APD>($t10, $t12, $t14, $t15, $t16)\l 15: $t5 := $t19\l 16: $t4 := $t18\l 17: $t2 := $t17\l 18: $t20 := copy($t0)\l 19: coin::register<DemoCoin::APD>($t20)\l 20: $t21 := 10000000000000000\l 21: $t22 := borrow_local($t5)\l 22: $t23 := coin::mint<DemoCoin::APD>($t21, $t22)\l 23: $t3 := $t23\l 24: $t24 := move($t1)\l 25: $t25 := move($t3)\l 26: coin::deposit<DemoCoin::APD>($t24, $t25)\l 27: $t26 := move($t5)\l 28: coin::destroy_mint_cap<DemoCoin::APD>($t26)\l 29: $t27 := move($t0)\l 30: $t28 := move($t2)\l 31: $t29 := move($t4)\l 32: $t30 := pack DemoCoin::CoinCapabilities($t28, $t29)\l 33: move_to<DemoCoin::CoinCapabilities>($t30, $t27)\l 34: return ()\l" shape=box]
-    0 -> 2 [ label = "" ]
-    2 -> 1 [ label = "" ]
-}
