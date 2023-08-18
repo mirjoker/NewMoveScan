@@ -200,7 +200,6 @@ fn collect_loop_back_edges(
 
 pub fn get_loops(function: &FunctionInfo) -> (Vec<NaturalLoop<u16>>, LoopAnnotation) {
     let code = &function.code;
-    
     if let Some(cfg) = function.cfg.as_ref(){
         let entry = cfg.entry_block();
         let nodes = cfg.blocks();
@@ -258,8 +257,7 @@ pub fn get_loops(function: &FunctionInfo) -> (Vec<NaturalLoop<u16>>, LoopAnnotat
     
         ( natural_loops, LoopAnnotation { fat_loops } )
     } else {
-        println!("hello");
-        panic!("error occured");
+        panic!("cfg is none: please check if function is native.");
     }
 
     // let cfg = function.cfg.as_ref().unwrap();
