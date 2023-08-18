@@ -1,65 +1,63 @@
 {
-    // 使用 IntelliSense 了解相关属性。 
-    // 悬停以查看现有属性的描述。
-    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in library 'MoveScanner'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--lib",
-                    "--package=MoveScanner"
-                ],
-                "filter": {
-                    "name": "MoveScanner",
-                    "kind": "lib"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug executable 'MoveScanner'",
-            "cargo": {
-                "args": [
-                    "build",
-                    "--bin=MoveScanner",
-                    "--package=MoveScanner"
-                ],
-                "filter": {
-                    "name": "MoveScanner",
-                    "kind": "bin"
-                }
-            },
-            // "args": ["-p", "./res/examples_mv/aptos/DemoCoin.mv"],
-            "args": ["-p", "/home/wlq/Project/MoveBit/MoveScanner/res/examples_mv/aptos"],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in executable 'MoveScanner'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=MoveScanner",
-                    "--package=MoveScanner"
-                ],
-                "filter": {
-                    "name": "MoveScanner",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
+  // 使用 IntelliSense 了解相关属性。
+  // 悬停以查看现有属性的描述。
+  // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'MoveScanner'",
+      "cargo": {
+        "args": ["build", "--bin=MoveScanner", "--package=MoveScanner"],
+        "filter": {
+          "name": "MoveScanner",
+          "kind": "bin"
         }
-    ]
+      },
+      // "args": ["-p", "./res/examples_mv/aptos/DemoCoin.mv"],
+      // "args": ["-p", "/home/wlq/Project/MoveBit/MoveScanner/res/examples_mv/aptos"],
+      "args": [
+        "-p",
+        "/home/wlq/Project/MoveBit/MoveScannerTest/OnChain/res/bytecode/Aptos/0x0000000000000000000000000000000000000000000000000000000000000001_type_info_40332321.mv",
+        "-o",
+        "/home/wlq/Project/MoveBit/MoveScannerTest/OnChain/result/json/Aptos/0x0000000000000000000000000000000000000000000000000000000000000001_type_info_40332321.json",
+        "-n"
+      ],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'MoveScanner'",
+      "cargo": {
+        "args": ["test", "--no-run", "--lib", "--package=MoveScanner"],
+        "filter": {
+          "name": "MoveScanner",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'MoveScanner'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=MoveScanner",
+          "--package=MoveScanner"
+        ],
+        "filter": {
+          "name": "MoveScanner",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
 }

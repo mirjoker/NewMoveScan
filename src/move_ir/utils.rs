@@ -489,3 +489,10 @@ pub fn get_function_name(idx: usize, stbgr: &StacklessBytecodeGenerator) -> Stri
         .to_string();
     return func_name;
 }
+
+pub fn is_native(idx: usize, stbgr: &StacklessBytecodeGenerator) -> bool {
+    stbgr
+        .module
+        .function_def_at(FunctionDefinitionIndex::new(idx as u16))
+        .is_native()
+}

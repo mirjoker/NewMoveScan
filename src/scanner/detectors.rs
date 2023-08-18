@@ -1,6 +1,9 @@
 use crate::{
     cli::parser::*,
-    move_ir::packages::{build_compiled_modules, Packages},
+    move_ir::{
+        packages::{build_compiled_modules, Packages},
+        utils,
+    },
     scanner::{
         detects::{
             detect1::Detector1, detect2::Detector2, detect3::Detector3, detect4::Detector4,
@@ -9,9 +12,8 @@ use crate::{
         result::*,
     },
 };
-use move_binary_format::{access::ModuleAccess, file_format::FunctionDefinitionIndex};
 use num::ToPrimitive;
-use std::{fs, io::Write, time::Instant};
+use std::{fs, io::Write, path::Path, time::Instant};
 
 pub trait AbstractDetector<'a> {
     fn new(packages: &'a Packages<'a>) -> Self
@@ -63,6 +65,15 @@ impl Detectors {
         let pretty_result = PrettyResult::from(self.result.clone());
         if let Some(output) = &self.args.output {
             // 输出到指定目录
+            let output_path = Path::new(output);
+            if let Some(dir_path) = output_path.parent() {
+                // 不存在则递归创建路径目录
+                if !dir_path.exists() {
+                    if let Err(error) = fs::create_dir_all(dir_path) {
+                        println!("Error creating directories: {:?}", error);
+                    }
+                }
+            }
             let mut file = fs::File::create(output).expect("Failed to create json file");
             file.write(json_result.as_bytes())
                 .expect("Failed to write to json file");
@@ -91,15 +102,12 @@ impl Detectors {
                 .unwrap() = stbgr.functions.len();
             // 遍历stbgr中的functions
             for (idx, _function) in stbgr.functions.iter().enumerate() {
-                let func_define = stbgr
-                    .module
-                    .function_def_at(FunctionDefinitionIndex::new(idx as u16));
-                if func_define.is_native() {
+                if utils::is_native(idx, stbgr) {
                     *module_info
                         .function_count
                         .get_mut(&FunctionType::Native)
                         .unwrap() += 1;
-                };
+                }
             }
             self.result.add_module(mname.to_string(), module_info);
         }

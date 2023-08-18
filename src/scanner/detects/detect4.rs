@@ -3,7 +3,7 @@
 use crate::{
     move_ir::{
         control_flow_graph::BlockId,
-        fatloop::get_loops,
+        fatloop,
         generate_bytecode::{FunctionInfo, StacklessBytecodeGenerator},
         packages::Packages,
         utils,
@@ -32,6 +32,10 @@ impl<'a> AbstractDetector<'a> for Detector4<'a> {
         for (mname, &ref stbgr) in self.packages.get_all_stbgr().iter() {
             self.content.result.insert(mname.to_string(), Vec::new());
             for (idx, _function) in stbgr.functions.iter().enumerate() {
+                // 跳过 native 函数
+                if utils::is_native(idx, stbgr) {
+                    continue;
+                }
                 if let Some(res) = self.detect_infinite_loop(stbgr, idx) {
                     self.content.result.get_mut(mname).unwrap().push(res);
                 }
@@ -48,7 +52,7 @@ impl<'a> Detector4<'a> {
         idx: usize,
     ) -> Option<String> {
         let function = &stbgr.functions[idx];
-        let (_natural_loops, fat_loops) = get_loops(function);
+        let (_natural_loops, fat_loops) = fatloop::get_loops(function);
         // let data_depent = data_dependency(packages, stbgr, idx, 1);
         let data_depent = &stbgr.data_dependency[idx];
         let cfg = function.cfg.as_ref().unwrap();

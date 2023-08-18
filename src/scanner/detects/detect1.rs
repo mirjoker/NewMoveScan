@@ -29,6 +29,10 @@ impl<'a> AbstractDetector<'a> for Detector1<'a> {
             // Vec<String> 中存储了当前 ModuleName 下的漏洞的函数名（通常来说，如果是unused_constant则会存储对应的常量类型和值）
             self.content.result.insert(mname.to_string(), Vec::new());
             for (idx, function) in stbgr.functions.iter().enumerate() {
+                // 跳过 native 函数
+                if utils::is_native(idx, stbgr) {
+                    continue;
+                }
                 if let Some(res) =
                     self.detect_unchecked_return(function, &stbgr.symbol_pool, idx, stbgr)
                 {

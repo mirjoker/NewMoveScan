@@ -21,6 +21,10 @@ impl<'a> AbstractDetector<'a> for Detector2<'a> {
         for (mname, &ref stbgr) in self.packages.get_all_stbgr().iter() {
             self.content.result.insert(mname.to_string(), Vec::new());
             for (idx, _function) in stbgr.functions.iter().enumerate() {
+                // 跳过 native 函数
+                if utils::is_native(idx, stbgr) {
+                    continue;
+                }
                 if let Some(res) = self.detect_overflow(stbgr, idx) {
                     self.content.result.get_mut(mname).unwrap().push(res);
                 }

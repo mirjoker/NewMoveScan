@@ -32,7 +32,6 @@ use super::{utils::*, data_dependency::DataDepent};
 pub fn addr_to_big_uint(addr: &AccountAddress) -> BigUint {
     BigUint::from_str_radix(&addr.to_string(), 16).unwrap()
 }
-
 pub struct FunctionInfo {
     pub idx: usize,
     pub name: String,

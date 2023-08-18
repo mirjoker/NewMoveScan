@@ -9,7 +9,7 @@ use crate::{
     scanner::{detectors::AbstractDetector, result::*},
 };
 use move_model::ty::{PrimitiveType, Type};
-use move_stackless_bytecode::stackless_bytecode::{Bytecode, Constant,Operation};
+use move_stackless_bytecode::stackless_bytecode::{Bytecode, Constant, Operation};
 pub struct Detector8<'a> {
     packages: &'a Packages<'a>,
     content: DetectContent,
@@ -26,6 +26,10 @@ impl<'a> AbstractDetector<'a> for Detector8<'a> {
         for (mname, &ref stbgr) in self.packages.get_all_stbgr().iter() {
             self.content.result.insert(mname.to_string(), Vec::new());
             for (idx, function) in stbgr.functions.iter().enumerate() {
+                // 跳过 native 函数
+                if utils::is_native(idx, stbgr) {
+                    continue;
+                }
                 if let Some(res) = self.detect_unnecessary_bool_judgment(function, stbgr, idx) {
                     self.content.result.get_mut(mname).unwrap().push(res);
                 }
