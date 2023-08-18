@@ -1,78 +1,48 @@
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use strum::IntoEnumIterator;
+use strum_macros::{Display, EnumIter};
 
 pub type ModuleName = String;
 pub type FunctionName = String;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, Display,Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+#[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
 pub enum Status {
-    #[serde(rename = "pass")]
     Pass,
-    #[serde(rename = "wrong")]
     Wrong,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, EnumIter, Display, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum DetectKind {
-    #[serde(rename = "unchecked_return")]
     UncheckedReturn,
-
-    #[serde(rename = "overflow")]
     Overflow,
-
-    #[serde(rename = "precision_loss")]
     PrecisionLoss,
-
-    #[serde(rename = "infinite_loop")]
     InfiniteLoop,
-
-    #[serde(rename = "unnecessary_type_conversion")]
     UnnecessaryTypeConversion,
-
-    #[serde(rename = "unnecessary_bool_judgment")]
     UnnecessaryBoolJudgment,
-
-    #[serde(rename = "unused_constant")]
     UnusedConstant,
-
-    #[serde(rename = "unused_private_functions")]
     UnusedPrivateFunctions,
 }
-impl std::fmt::Display for DetectKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            DetectKind::UncheckedReturn => write!(f, "unchecked_return"),
-            DetectKind::Overflow => write!(f, "overflow"),
-            DetectKind::PrecisionLoss => write!(f, "precision_loss"),
-            DetectKind::InfiniteLoop => write!(f, "infinite_loop"),
-            DetectKind::UnnecessaryTypeConversion => write!(f, "unnecessary_type_conversion"),
-            DetectKind::UnnecessaryBoolJudgment => write!(f, "unnecessary_bool_judgment"),
-            DetectKind::UnusedConstant => write!(f, "unused_constant"),
-            DetectKind::UnusedPrivateFunctions => write!(f, "unused_private_functions"),
-        }
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+#[serde(rename_all = "lowercase")]
 pub enum FunctionType {
-    #[serde(rename = "all")]
     All,
-    #[serde(rename = "native")]
     Native,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+#[serde(rename_all = "lowercase")]
 pub enum Severity {
-    #[serde(rename = "info")]
     Info,
-    #[serde(rename = "minor")]
     Minor,
-    #[serde(rename = "medium")]
     Medium,
-    #[serde(rename = "major")]
     Major,
-    #[serde(rename = "critical")]
     Critical,
 }
 
@@ -146,16 +116,10 @@ impl ModuleInfo {
 
     pub fn empty() -> Self {
         let function_count = HashMap::from([(FunctionType::All, 0), (FunctionType::Native, 0)]);
-        let detectors = HashMap::from([
-            (DetectKind::UncheckedReturn, Vec::<String>::new()),
-            (DetectKind::Overflow, Vec::<String>::new()),
-            (DetectKind::PrecisionLoss, Vec::<String>::new()),
-            (DetectKind::InfiniteLoop, Vec::<String>::new()),
-            (DetectKind::UnnecessaryTypeConversion, Vec::<String>::new()),
-            (DetectKind::UnnecessaryBoolJudgment, Vec::<String>::new()),
-            (DetectKind::UnusedConstant, Vec::<String>::new()),
-            (DetectKind::UnusedPrivateFunctions, Vec::<String>::new()),
-        ]);
+        let mut detectors = HashMap::new();
+        for detect_kind in DetectKind::iter() {
+            detectors.insert(detect_kind, Vec::<String>::new());
+        }
         return Self::new(function_count, 0, detectors);
     }
 }
@@ -194,8 +158,10 @@ impl std::fmt::Display for PrettyResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
-            "\npass: \x1B[32m{:<6}\x1B[0m wrong: \x1B[31m{:<6}\x1B[0m time: \x1B[34m{}\x1B[0m us\n",
+            "\n{}: \x1B[32m{:<6}\x1B[0m {}: \x1B[31m{:<6}\x1B[0m time: \x1B[34m{}\x1B[0m us\n",
+            Status::Pass,
             self.modules_status.get(&Status::Pass).unwrap(),
+            Status::Wrong,
             self.modules_status.get(&Status::Wrong).unwrap(),
             self.total_time
         )?;
