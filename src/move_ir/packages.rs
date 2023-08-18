@@ -1,11 +1,14 @@
-use std::{path::PathBuf,collections::BTreeMap};
+use super::generate_bytecode::{FunctionInfo, StacklessBytecodeGenerator};
+use crate::utils::utils;
 use move_binary_format::CompiledModule;
 use move_model::model::FunId;
-use super::generate_bytecode::{StacklessBytecodeGenerator, FunctionInfo};
-use crate::utils::utils;
-use std::{fs, io::{BufReader, Read}};
+use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    fs,
+    io::{BufReader, Read},
+};
 
-pub struct Packages<'a>{
+pub struct Packages<'a> {
     packages: BTreeMap<String, StacklessBytecodeGenerator<'a>>,
     // todo 新增 Status，其中维护构建失败和成功的数量
 }
@@ -29,9 +32,7 @@ impl<'a> Packages<'a> {
             let mname = mname.display(&stbgr.symbol_pool).to_string();
             packages.insert(mname, stbgr);
         }
-        Packages { 
-            packages: packages,
-        }
+        Packages { packages: packages }
     }
 
     pub fn get_all_stbgr(&self) -> &BTreeMap<String, StacklessBytecodeGenerator<'a>> {
@@ -64,7 +65,7 @@ pub fn compile_module(filename: PathBuf) -> Option<CompiledModule> {
     cm.ok()
 }
 
-pub fn build_compiled_modules(path:&String) -> Vec<CompiledModule> {
+pub fn build_compiled_modules(path: &String) -> Vec<CompiledModule> {
     let dir = PathBuf::from(&path);
     // 输入路径遍历
     let mut paths = Vec::new();
@@ -76,8 +77,7 @@ pub fn build_compiled_modules(path:&String) -> Vec<CompiledModule> {
         if let Some(cm) = compile_module(filename.clone()) {
             cms.push(cm);
         } else {
-            // todo 加红！
-            println!("Fail to deserialize {:?} !!!", filename);
+            println!("\x1B[31mFail to deserialize {:?}, Skip.\x1B[0m", filename);
         }
     }
     cms
