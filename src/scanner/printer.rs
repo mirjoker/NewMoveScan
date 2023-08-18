@@ -56,7 +56,7 @@ impl Printer {
                     println!("{:#?}", stbgr.module);
                 }
                 Some(IR::FS) => {
-                    println!("{}", stbgr.display(false, None));
+                    stbgr.print_func_signature();
                 }
                 Some(IR::DU) => {
                     for (_idx, function) in stbgr.functions.iter().enumerate() {

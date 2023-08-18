@@ -421,6 +421,104 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         }
         f
     }
+
+    pub fn print_func_signature(&self) {
+        println!("**********Function Signatures For {} Module***********",self.module_data.name.display(&self.symbol_pool));
+        let mut func_signatures: Vec<String> = vec![];
+        let mut idxs = vec![];
+        for idx in 0..self.functions.len() {
+            idxs.push(FunctionDefinitionIndex::new(idx as u16));
+        }
+        for idx in idxs.iter() {
+            let mut fs = String::new();
+            let func_id = self.module_data.function_idx_to_id[idx];
+            let func_define = self.module.function_def_at(*idx);
+            let func_data: &move_model::model::FunctionData = &self.module_data.function_data[&func_id];
+            let function = &self.functions[idx.into_index()];
+            let view = FunctionDefinitionView::new(self.module, func_define);
+            let modifier = if func_define.is_native() {
+                "native"
+            } else if func_define.is_entry {
+                "entry"
+            } else {
+                ""
+            };
+            if utils::visibility_str(&func_define.visibility) != "" {
+                write!(fs, "\x1B[34m{}\x1B[0m ", utils::visibility_str(&func_define.visibility)).unwrap();
+            }
+            if modifier != "" {
+                write!(fs, "\x1B[34m{}\x1B[0m ", modifier).unwrap();
+            }
+            write!(
+                fs,
+                "\x1B[34mfun\x1B[0m \x1B[93m{}\x1B[0m::\x1B[93m{}\x1B[0m",
+                self.module_data.name.display(&self.symbol_pool),
+                func_data.name.display(&self.symbol_pool)
+            ).unwrap();
+            // ghost_type_param_count?
+            let tparams_count_all = view.type_parameters().len();
+            if tparams_count_all != 0 {
+                write!(fs, "<").unwrap();
+                for i in 0..tparams_count_all {
+                    if i > 0 {
+                        write!(fs, ", ").unwrap();
+                    }
+                    write!(fs, "#{}", i).unwrap();
+                }
+                write!(fs, ">").unwrap();
+            }
+            let tctx = TypeDisplayContext::WithoutEnv {
+                symbol_pool: &self.symbol_pool,
+                reverse_struct_table: &self.reverse_struct_table,
+            };
+            let write_decl = |f: &mut String, i: TempIndex| {
+                let ty_ = &function.local_types[i];
+                let ty = ty_.display(&tctx);
+                let param = format!("{}", ty);
+                    write!(f, "\x1B[32m{}\x1B[0m", param).unwrap()
+            };
+            write!(fs, "(").unwrap();
+
+            for i in 0..view.arg_tokens().count() {
+                if i > 0 {
+                    write!(fs, ", ").unwrap();
+                }
+                write_decl(&mut fs, i);
+            }
+            write!(fs, ")").unwrap();
+            if view.return_count() > 0 {
+                write!(fs, ": ").unwrap();
+                if view.return_count() > 1 {
+                    write!(fs, "(").unwrap();
+                }
+                let returns = &view.return_().0;
+                for i in 0..view.return_count() {
+                    if i > 0 {
+                        write!(fs, ", ").unwrap();
+                    }
+                    write!(
+                        fs,
+                        "\x1B[32m{}\x1B[0m",
+                        self.globalize_signature(&returns[i]).display(&tctx)
+                    ).unwrap();
+                }
+                if view.return_count() > 1 {
+                    write!(fs, ")").unwrap();
+                }
+            }
+            func_signatures.push(fs);
+        }
+
+        func_signatures.sort();
+        
+        for fs in func_signatures.iter() {
+            println!("{}", fs);
+        }
+        println!();
+
+    }
+
+    
 }
 
 

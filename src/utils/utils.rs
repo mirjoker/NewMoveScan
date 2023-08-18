@@ -51,8 +51,8 @@ pub fn is_dep_module(module_env: &ModuleEnv) -> bool {
 
 pub fn visibility_str(visibility: &Visibility) -> &str {
     match visibility {
-        Visibility::Public => "public ",
-        Visibility::Friend => "public(friend) ",
+        Visibility::Public => "public",
+        Visibility::Friend => "public(friend)",
         Visibility::Private => "",
     }
 }
