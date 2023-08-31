@@ -4,7 +4,7 @@ use std::{
     fs::{File, self},
     io::{BufWriter, Write},
     os::fd,
-    path::PathBuf,
+    path::PathBuf, collections::BTreeMap,
 };
 
 use move_binary_format::access::ModuleAccess;
@@ -17,19 +17,6 @@ use std::io::{BufRead, BufReader};
 
 use walkdir::WalkDir;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct Benchmark {
-    package_name: String,
-    package: Package,
-}
-impl Benchmark {
-    fn new() -> Self {
-        Benchmark { 
-            package_name: String::new(), 
-            package: Package::new() 
-        }
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Package {
@@ -41,8 +28,8 @@ struct Package {
 impl Package {
     fn new() -> Self {
         Package { 
-            module_name: String::new(), 
-            chain_type: 2, 
+            module_name: String::new(),
+            chain_type: 2,  
             function: Function::new(), 
             constant: Const::new() 
         }
@@ -172,7 +159,7 @@ fn get_root_dir(start_directory: &str) -> Vec<(bool, String, PathBuf, PathBuf)> 
 #[test]
 fn build_benchmark() {
     let root_dirs = ["../MoveScannerTest/OpenSource/res/repo/Aptos/", "../MoveScannerTest/OpenSource/res/repo/Sui/", "../MoveScannerTest/OpenSource/res/repo/Move/"];
-    let mut benchmark = Benchmark::new();
+    let mut benchmark: BTreeMap<String, Package> = BTreeMap::new();
     // for index in 0..3 {
     //     let root_dir = root_dirs[index];
 
