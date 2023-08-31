@@ -20,46 +20,28 @@ use walkdir::WalkDir;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Package {
-    module_name: String,
     chain_type: usize, // 0->aptos, 1->sui, 2->move
-    function: Function,
-    constant: Const,
+    modules: BTreeMap<String, Module>,
 }
 impl Package {
     fn new() -> Self {
         Package { 
-            module_name: String::new(),
-            chain_type: 2,  
-            function: Function::new(), 
-            constant: Const::new() 
+            chain_type: 2, 
+            modules: BTreeMap::new(), 
         }
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct Function{
-    function_name: String,
-    functiontag: FuctionTag,
+struct Module {
+    function: BTreeMap<String, FuctionTag>,
+    constant: BTreeMap<String, bool>,
 }
-impl Function {
+impl Module {
     fn new() -> Self {
-        Function { 
-            function_name: String::new(), 
-            functiontag: FuctionTag::new() 
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct Const{
-    constant_name: String, // name = type + value
-    tag: bool,
-}
-impl Const {
-    fn new() -> Self {
-        Const { 
-            constant_name: String::new(), 
-            tag: false 
+        Module { 
+            function: BTreeMap::new(), 
+            constant: BTreeMap::new(), 
         }
     }
 }
@@ -92,15 +74,15 @@ impl FuctionTag {
     }
 }
 
-fn get_root_dir(start_directory: &str) -> Vec<(bool, String, PathBuf, PathBuf)> {
-    let mut result: Vec<(bool, String, PathBuf, PathBuf)> = Vec::new();
+fn get_root_dir(start_directory: &str) -> Vec<(usize, String, PathBuf)> {
+    let mut result: Vec<(usize, String, PathBuf)> = Vec::new();
 
     for entry in WalkDir::new(start_directory).follow_links(true) {
         if let Ok(entry) = entry {
             if let Some(file_name) = entry.file_name().to_str() {
                 if file_name == "Move.toml" {
                     let mut name = "".to_string();
-                    let mut is_aptos = true;
+                    let mut chain_type: usize = 2;
                     if let Ok(file) = File::open(entry.path()) {
                         let reader = BufReader::new(file);
                         for line in reader.lines() {
@@ -122,10 +104,10 @@ fn get_root_dir(start_directory: &str) -> Vec<(bool, String, PathBuf, PathBuf)> 
                                         .to_string();
                                     name = _name;
                                 }
-                                if line.contains("MystenLabs") || line.contains("sui"){
-                                    is_aptos = false;
-                                } else if line.contains("aptos") {
-                                    is_aptos = true;
+                                if line.contains("MystenLabs") || line.contains("sui") || line.contains("Sui") {
+                                    chain_type = 1;
+                                } else if line.contains("aptos") || line.contains("Aptos") {
+                                    chain_type = 0;
                                 }
                             }
                         }
@@ -135,15 +117,11 @@ fn get_root_dir(start_directory: &str) -> Vec<(bool, String, PathBuf, PathBuf)> 
                     if let Some(parent_dir) = move_toml_path.parent() {
                         let bytecode_dir = format!("build/{}/bytecode_modules/", name);
                         let bytecode_dir = parent_dir.join(bytecode_dir);
-                        let source_dir = format!("build/{}/sources/", name);
-                        let source_dir = parent_dir.join(source_dir);
                         if bytecode_dir.exists()
                             && bytecode_dir.is_dir()
-                            && source_dir.exists()
-                            && source_dir.is_dir()
                         {
                             // println!("{} -> {}",parent_dir.to_str().unwrap(), name);
-                            result.push((is_aptos, name, bytecode_dir, source_dir));
+                            result.push((chain_type, name, bytecode_dir));
                         } else {
                             // println!("Failed! {} -> {}", parent_dir.to_str().unwrap(), name);
                             println!("Not found bytecode_file directory: {:?}", name);
@@ -160,86 +138,53 @@ fn get_root_dir(start_directory: &str) -> Vec<(bool, String, PathBuf, PathBuf)> 
 fn build_benchmark() {
     let root_dirs = ["../MoveScannerTest/OpenSource/res/repo/Aptos/", "../MoveScannerTest/OpenSource/res/repo/Sui/", "../MoveScannerTest/OpenSource/res/repo/Move/"];
     let mut benchmark: BTreeMap<String, Package> = BTreeMap::new();
-    // for index in 0..3 {
-    //     let root_dir = root_dirs[index];
+    for index in 0..3 {
+        let root_dir = root_dirs[index];
+        let root_dirs = get_root_dir(root_dir);
 
-    //     let root_dirs = get_root_dir(root_dir);
-    //     let mut packages: Vec<DatasetFeature> = Vec::new();
-    //     for (is_aptos, package_name, bytecode_dir, source_dir) in root_dirs {
-    //         let mut paths = Vec::new();
-    //         visit_dirs(&bytecode_dir, &mut paths, false);
-    //         paths.sort();
-    //         let mut cms = Vec::new();
-    //         for filename in paths {
-    //             if let Some(cm) = compile_module(filename.clone()) {
-    //                 cms.push(cm);
-    //             } else {
-    //                 println!("Fail to deserialize {:?} !!!", filename);
-    //             }
-    //         }
+        for (chain_type, package_name, bytecode_dir) in root_dirs {
+            let mut package = Package::new();
+            package.chain_type = chain_type;
 
-    //         let mut paths = Vec::new();
-    //         visit_dirs(&source_dir, &mut paths, false);
-    //         paths.sort();
+            let mut paths = Vec::new();
+            visit_dirs(&bytecode_dir, &mut paths, false);
+            paths.sort();
+            for filename in paths {
+                if let Some(cm) = compile_module(filename.clone()) {
+                    let mut module = Module::new();
 
-    //         let mut modules: Vec<Module> = Vec::new();
-    //         for (i, cm) in cms.iter().enumerate() {
-    //             let mut functions: Vec<Function> = Vec::new();
-    //             for fdef in cm.function_defs.iter() {
-    //                 let fname = cm.function_handle_at(fdef.function).name;
-    //                 let function_name = cm.identifier_at(fname).to_string();
-    //                 let cnt_opcodes = if fdef.code.as_ref().is_some() {
-    //                     fdef.code.as_ref().unwrap().code.len()
-    //                 } else {
-    //                     0
-    //                 };
-    //                 functions.push(Function::new(function_name, cnt_opcodes))
-    //             }
-    //             let mname = cm.module_handles[0].name;
-    //             let module_name = cm.identifier_at(mname).to_string();
-    //             let cnt_constants = cm.constant_pool().len();
-    //             let source_file = File::open(paths[i].clone()).expect("Failed to open file");
-    //             let reader = BufReader::new(source_file);
-    //             let cnt_codes = reader.lines().count();
-    //             let module = Module::new(module_name, cnt_constants, cnt_codes, functions);
-    //             modules.push(module);
-    //         }
+                    for fdef in cm.function_defs.iter() {
+                        let fname = cm.function_handle_at(fdef.function).name;
+                        let function_name = cm.identifier_at(fname).to_string();
+                        module.function.insert(function_name, FuctionTag::new());
+                    }
 
-    //         let mut package_dir = bytecode_dir.to_str().unwrap().to_string();
-    //         if let Some(start_index) = package_dir.find(root_dir) {
-    //             let start_position = start_index + root_dir.len();
-    //             if let Some(end_index) = package_dir[start_position..].find("/build") {
-    //                 let end_position = start_position + end_index;
-    //                 let result = &package_dir[start_position..end_position];
-    //                 package_dir = result.to_string();
-    //             }
-    //         }
+                    let constants = &cm.constant_pool;
+                    for cst in constants.iter() {
+                        module.constant.insert(format!("{:?}",cst), false);
+                    }
+                    
+                    let mname = cm.module_handles[0].name;
+                    let module_name = cm.identifier_at(mname).to_string();
+                    package.modules.insert(module_name, module);
 
-    //         let feature = DatasetFeature::new(is_aptos, package_dir, package_name, modules);
-    //         packages.push(feature);
-    //     }
+                } else {
+                    println!("Fail to deserialize {:?} !!!", filename);
+                }
+            }
 
-    //     let file = File::create(result_path).expect("Failed to create file");
-    //     let mut writer = BufWriter::new(file);
-    //     let header = "package_dir,package_name,aptos_or_sui,cnt_modules,cnt_functions,cnt_constants,cnt_codes,cnt_opcodes";
-    //     writeln!(writer, "{}", header).expect("Failed to write to file");
-
-    //     for feature in &packages {
-    //         let is_aptos = if feature.is_aptos { "aptos" } else { "sui" };
-    //         let line = format!(
-    //             "{},{},{},{},{},{},{},{}",
-    //             feature.package_dir,
-    //             feature.package_name,
-    //             is_aptos,
-    //             feature.cnt_modules,
-    //             feature.cnt_functions,
-    //             feature.cnt_constants,
-    //             feature.cnt_codes,
-    //             feature.cnt_opcodes
-    //         );
-    //         writeln!(writer, "{}", line).expect("Failed to write to file");
-    //     }
-    // }
+            let mut package_dir = bytecode_dir.to_str().unwrap().to_string();
+            if let Some(start_index) = package_dir.find(root_dir) {
+                let start_position = start_index + root_dir.len();
+                if let Some(end_index) = package_dir[start_position..].find("/build") {
+                    let end_position = start_position + end_index;
+                    let result = &package_dir[start_position..end_position];
+                    package_dir = result.to_string();
+                }
+            }
+            benchmark.insert(package_dir, package);
+        }
+    }
     let mut file = fs::File::create("OpenSource_benchmark.json").expect("Failed to create json file");
     let json_result = serde_json::to_string(&benchmark).ok().unwrap();
     file.write(json_result.as_bytes()).expect("Failed to write to json file");
