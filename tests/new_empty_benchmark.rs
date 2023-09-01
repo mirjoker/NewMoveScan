@@ -37,13 +37,13 @@ impl Package {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Module {
     function: BTreeMap<String, FuctionTag>,
-    constant: BTreeMap<String, bool>,
+    constant: usize,
 }
 impl Module {
     fn new() -> Self {
         Module { 
             function: BTreeMap::new(), 
-            constant: BTreeMap::new(), 
+            constant: 0, 
         }
     }
 }
@@ -55,7 +55,6 @@ struct FuctionTag {
     infinite_loop: bool,
     overflow: bool,
     unnecessary_bool_judgment: bool,
-    unused_constant: bool,
     precision_loss: bool,
     unnecessary_type_conversion: bool,
     unchecked_return: bool
@@ -63,15 +62,14 @@ struct FuctionTag {
 impl FuctionTag {
     fn new() -> Self {
         FuctionTag { 
-            unused_private_functions: false, 
-            recursive_function_call: false, 
-            infinite_loop: false, 
-            overflow: false, 
-            unnecessary_bool_judgment: false, 
-            unused_constant: false, 
-            precision_loss: false, 
-            unnecessary_type_conversion: false, 
-            unchecked_return: false ,
+            unused_private_functions: 0, 
+            recursive_function_call: 0, 
+            infinite_loop: 0, 
+            overflow: 0, 
+            unnecessary_bool_judgment: 0, 
+            precision_loss: 0, 
+            unnecessary_type_conversion: 0, 
+            unchecked_return: 0 ,
         }
     }
 }
@@ -106,11 +104,6 @@ fn get_root_dir(start_directory: &str) -> Vec<(usize, String, PathBuf)> {
                                         .to_string();
                                     name = _name;
                                 }
-                                if line.contains("MystenLabs") || line.contains("sui") || line.contains("Sui") {
-                                    chain_type = 1;
-                                } else if line.contains("aptos") || line.contains("Aptos") {
-                                    chain_type = 0;
-                                }
                             }
                         }
                     }
@@ -138,15 +131,16 @@ fn get_root_dir(start_directory: &str) -> Vec<(usize, String, PathBuf)> {
 
 #[test]
 fn build_benchmark() {
-    let root_dirs = ["../MoveScannerTest/OpenSource/res/repo/Aptos/", "../MoveScannerTest/OpenSource/res/repo/Sui/", "../MoveScannerTest/OpenSource/res/repo/Move/"];
+    // let root_dirs = ["../MoveScannerTest/OpenSource/res/repo/Aptos/", "../MoveScannerTest/OpenSource/res/repo/Sui/", "../MoveScannerTest/OpenSource/res/repo/Move/"];
+    let root_dirs = ["../MoveScannerTest/Audit/res/repo/audit_project_set/aptos", "../MoveScannerTest/Audit/res/repo/audit_project_set/sui"];
     let mut benchmark: BTreeMap<String, Package> = BTreeMap::new();
-    for index in 0..3 {
+    for index in 0..root_dirs.len() {
         let root_dir = root_dirs[index];
         let root_dirs = get_root_dir(root_dir);
 
-        for (chain_type, package_name, bytecode_dir) in root_dirs {
+        for (package_name, bytecode_dir) in root_dirs {
             let mut package = Package::new();
-            package.chain_type = chain_type;
+            package.chain_type = index;
 
             let mut paths = Vec::new();
             visit_dirs(&bytecode_dir, &mut paths, false);
@@ -159,11 +153,6 @@ fn build_benchmark() {
                         let fname = cm.function_handle_at(fdef.function).name;
                         let function_name = cm.identifier_at(fname).to_string();
                         module.function.insert(function_name, FuctionTag::new());
-                    }
-
-                    let constants = &cm.constant_pool;
-                    for cst in constants.iter() {
-                        module.constant.insert(format!("{:?}",cst.deserialize_constant().unwrap()), false);
                     }
                     
                     let mname = cm.module_handles[0].name;
@@ -188,7 +177,8 @@ fn build_benchmark() {
             benchmark.insert(package_name, package);
         }
     }
-    let mut file = fs::File::create("OpenSource_benchmark.json").expect("Failed to create json file");
+    // let mut file = fs::File::create("OpenSource_benchmark.json").expect("Failed to create json file");
+    let mut file = fs::File::create("Audit_benchmark.json").expect("Failed to create json file");
     let json_result = serde_json::to_string(&benchmark).ok().unwrap();
     file.write(json_result.as_bytes()).expect("Failed to write to json file");
 }
