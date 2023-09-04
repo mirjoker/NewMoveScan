@@ -21,14 +21,12 @@ use walkdir::WalkDir;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Package {
     chain_type: usize, // 0->aptos, 1->sui, 2->move
-    path: String,
     modules: BTreeMap<String, Module>,
 }
 impl Package {
     fn new() -> Self {
         Package { 
             chain_type: 2,
-            path: String::new(),
             modules: BTreeMap::new(), 
         }
     }
@@ -175,8 +173,7 @@ fn new_benchmark(root_dirs: Vec<&str>, output: String) {
                     package_dir = result.to_string();
                 }
             }
-            package.path = package_dir;
-            benchmark.insert(package_name, package);
+            benchmark.insert(package_dir, package);
         }
     }
     let mut file = fs::File::create(output).expect("Failed to create json file");
