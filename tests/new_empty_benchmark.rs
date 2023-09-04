@@ -50,20 +50,18 @@ impl Module {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct FuctionTag {
-    unused_private_functions: bool,
-    recursive_function_call: bool,
-    infinite_loop: bool,
-    overflow: bool,
-    unnecessary_bool_judgment: bool,
-    precision_loss: bool,
-    unnecessary_type_conversion: bool,
-    unchecked_return: bool
+    unused_private_functions: usize,
+    infinite_loop: usize,
+    overflow: usize,
+    unnecessary_bool_judgment: usize,
+    precision_loss: usize,
+    unnecessary_type_conversion: usize,
+    unchecked_return: usize
 }
 impl FuctionTag {
     fn new() -> Self {
         FuctionTag { 
             unused_private_functions: 0, 
-            recursive_function_call: 0, 
             infinite_loop: 0, 
             overflow: 0, 
             unnecessary_bool_judgment: 0, 
@@ -74,15 +72,14 @@ impl FuctionTag {
     }
 }
 
-fn get_root_dir(start_directory: &str) -> Vec<(usize, String, PathBuf)> {
-    let mut result: Vec<(usize, String, PathBuf)> = Vec::new();
+fn get_root_dir(start_directory: &str) -> Vec<(String, PathBuf)> {
+    let mut result: Vec<(String, PathBuf)> = Vec::new();
 
     for entry in WalkDir::new(start_directory).follow_links(true) {
         if let Ok(entry) = entry {
             if let Some(file_name) = entry.file_name().to_str() {
                 if file_name == "Move.toml" {
                     let mut name = "".to_string();
-                    let mut chain_type: usize = 2;
                     if let Ok(file) = File::open(entry.path()) {
                         let reader = BufReader::new(file);
                         for line in reader.lines() {
@@ -116,7 +113,7 @@ fn get_root_dir(start_directory: &str) -> Vec<(usize, String, PathBuf)> {
                             && bytecode_dir.is_dir()
                         {
                             // println!("{} -> {}",parent_dir.to_str().unwrap(), name);
-                            result.push((chain_type, name, bytecode_dir));
+                            result.push((name, bytecode_dir));
                         } else {
                             // println!("Failed! {} -> {}", parent_dir.to_str().unwrap(), name);
                             println!("Not found bytecode_file directory: {:?}", name);
@@ -131,8 +128,13 @@ fn get_root_dir(start_directory: &str) -> Vec<(usize, String, PathBuf)> {
 
 #[test]
 fn build_benchmark() {
-    // let root_dirs = ["../MoveScannerTest/OpenSource/res/repo/Aptos/", "../MoveScannerTest/OpenSource/res/repo/Sui/", "../MoveScannerTest/OpenSource/res/repo/Move/"];
+    let root_dirs = ["../MoveScannerTest/OpenSource/res/repo/Aptos/", "../MoveScannerTest/OpenSource/res/repo/Sui/", "../MoveScannerTest/OpenSource/res/repo/Move/"];
+    new_benchmark(root_dirs.to_vec(), "OpenSource_benchmark.json".to_owned());
     let root_dirs = ["../MoveScannerTest/Audit/res/repo/audit_project_set/aptos", "../MoveScannerTest/Audit/res/repo/audit_project_set/sui"];
+    new_benchmark(root_dirs.to_vec(), "Audit_benchmark.json".to_owned());
+}
+
+fn new_benchmark(root_dirs: Vec<&str>, output: String) {
     let mut benchmark: BTreeMap<String, Package> = BTreeMap::new();
     for index in 0..root_dirs.len() {
         let root_dir = root_dirs[index];
@@ -177,8 +179,7 @@ fn build_benchmark() {
             benchmark.insert(package_name, package);
         }
     }
-    // let mut file = fs::File::create("OpenSource_benchmark.json").expect("Failed to create json file");
-    let mut file = fs::File::create("Audit_benchmark.json").expect("Failed to create json file");
+    let mut file = fs::File::create(output).expect("Failed to create json file");
     let json_result = serde_json::to_string(&benchmark).ok().unwrap();
     file.write(json_result.as_bytes()).expect("Failed to write to json file");
 }

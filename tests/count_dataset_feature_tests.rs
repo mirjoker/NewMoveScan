@@ -60,7 +60,7 @@ impl Module {
 }
 
 struct DatasetFeature {
-    is_aptos: bool,
+    chain_type: usize,
     package_dir: String,
     package_name: String,
     cnt_modules: usize,
@@ -72,14 +72,14 @@ struct DatasetFeature {
 }
 
 impl DatasetFeature {
-    fn new(is_aptos: bool, package_dir: String, package_name: String, _modules: Vec<Module>) -> Self {
+    fn new(chain_type: usize, package_dir: String, package_name: String, _modules: Vec<Module>) -> Self {
         let cnt_modules = _modules.len();
         let cnt_functions = _modules.iter().map(|m| m.cnt_functions).sum();
         let cnt_constants = _modules.iter().map(|m| m.cnt_constants).sum();
         let cnt_codes = _modules.iter().map(|m| m.cnt_codes).sum();
         let cnt_opcodes = _modules.iter().map(|m| m.cnt_opcodes).sum();
         DatasetFeature {
-            is_aptos,
+            chain_type,
             package_dir,
             package_name,
             cnt_modules,
@@ -104,15 +104,15 @@ impl DatasetFeature {
     }
 }
 
-fn get_root_dir(start_directory: &str) -> Vec<(bool, String, PathBuf, PathBuf)> {
-    let mut result: Vec<(bool, String, PathBuf, PathBuf)> = Vec::new();
+fn get_root_dir(start_directory: &str) -> Vec<(String, PathBuf, PathBuf)> {
+    let mut result: Vec<(String, PathBuf, PathBuf)> = Vec::new();
 
     for entry in WalkDir::new(start_directory).follow_links(true) {
         if let Ok(entry) = entry {
             if let Some(file_name) = entry.file_name().to_str() {
                 if file_name == "Move.toml" {
                     let mut name = "".to_string();
-                    let mut is_aptos = true;
+                    // let mut is_aptos = true;
                     if let Ok(file) = File::open(entry.path()) {
                         let reader = BufReader::new(file);
                         for line in reader.lines() {
@@ -134,11 +134,11 @@ fn get_root_dir(start_directory: &str) -> Vec<(bool, String, PathBuf, PathBuf)> 
                                         .to_string();
                                     name = _name;
                                 }
-                                if line.contains("MystenLabs") || line.contains("sui"){
-                                    is_aptos = false;
-                                } else if line.contains("aptos") {
-                                    is_aptos = true;
-                                }
+                                // if line.contains("MystenLabs") || line.contains("sui"){
+                                //     is_aptos = false;
+                                // } else if line.contains("aptos") {
+                                //     is_aptos = true;
+                                // }
                             }
                         }
                     }
@@ -155,7 +155,7 @@ fn get_root_dir(start_directory: &str) -> Vec<(bool, String, PathBuf, PathBuf)> 
                             && source_dir.is_dir()
                         {
                             // println!("{} -> {}",parent_dir.to_str().unwrap(), name);
-                            result.push((is_aptos, name, bytecode_dir, source_dir));
+                            result.push((name, bytecode_dir, source_dir));
                         } else {
                             // println!("Failed! {} -> {}", parent_dir.to_str().unwrap(), name);
                             println!("Not found bytecode_file directory: {:?}", name);
@@ -169,16 +169,23 @@ fn get_root_dir(start_directory: &str) -> Vec<(bool, String, PathBuf, PathBuf)> 
 }
 
 #[test]
-fn count_feature() {
-    for index in 0..3 {
-        let root_dirs = ["../MoveScannerTest/OpenSource/res/repo/Aptos/", "../MoveScannerTest/OpenSource/res/repo/Sui/", "../MoveScannerTest/OpenSource/res/repo/Move/"];
-        let result_paths = ["../MoveScannerTest/OpenSource/res/repo/OpenSourceAptos.csv", "../MoveScannerTest/OpenSource/res/repo/OpenSourceSui.csv", "../MoveScannerTest/OpenSource/res/repo/OpensourceMove.csv"];
+fn test_run() {
+    let root_dirs = ["../MoveScannerTest/OpenSource/res/repo/Aptos/", "../MoveScannerTest/OpenSource/res/repo/Sui/", "../MoveScannerTest/OpenSource/res/repo/Move/"];
+    let result_paths = ["../MoveScannerTest/OpenSource/res/features/OpenSourceAptos.csv", "../MoveScannerTest/OpenSource/res/features/OpenSourceSui.csv", "../MoveScannerTest/OpenSource/res/features/OpensourceMove.csv"];
+    count_feature(root_dirs.to_vec(), result_paths.to_vec());
+    let root_dirs = ["../MoveScannerTest/Audit/res/repo/audit_project_set/aptos", "../MoveScannerTest/Audit/res/repo/audit_project_set/sui"];
+    let result_paths = ["../MoveScannerTest/Audit/res/features/AuditAptos.csv", "../MoveScannerTest/Audit/res/features/AuditSui.csv"];
+    count_feature(root_dirs.to_vec(), result_paths.to_vec());
+}
+
+fn count_feature(root_dirs: Vec<&str>, result_paths: Vec<&str>) {
+    for index in 0..root_dirs.len() {
         let root_dir = root_dirs[index];
         let result_path = result_paths[index];
 
         let root_dirs = get_root_dir(root_dir);
         let mut packages: Vec<DatasetFeature> = Vec::new();
-        for (is_aptos, package_name, bytecode_dir, source_dir) in root_dirs {
+        for (package_name, bytecode_dir, source_dir) in root_dirs {
             let mut paths = Vec::new();
             visit_dirs(&bytecode_dir, &mut paths, false);
             paths.sort();
@@ -228,7 +235,7 @@ fn count_feature() {
                 }
             }
 
-            let feature = DatasetFeature::new(is_aptos, package_dir, package_name, modules);
+            let feature = DatasetFeature::new(index, package_dir, package_name, modules);
             packages.push(feature);
         }
 
@@ -238,12 +245,19 @@ fn count_feature() {
         writeln!(writer, "{}", header).expect("Failed to write to file");
 
         for feature in &packages {
-            let is_aptos = if feature.is_aptos { "aptos" } else { "sui" };
+            let chain_type;
+            if feature.chain_type == 0 { 
+                chain_type = "aptos" ;
+            } else if feature.chain_type == 1 {
+                chain_type = "sui" ;
+            } else {
+                chain_type = "move" ;
+            }
             let line = format!(
                 "{},{},{},{},{},{},{},{}",
                 feature.package_dir,
                 feature.package_name,
-                is_aptos,
+                chain_type,
                 feature.cnt_modules,
                 feature.cnt_functions,
                 feature.cnt_constants,
