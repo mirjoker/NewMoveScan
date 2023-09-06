@@ -10,6 +10,7 @@ MoveScanner is a bytecode based move static analysis tool written in rust.
 cd MoveScanner
 ./build.sh
 ```
+Use 32-bit addresses as the default value(move32), support for detecting projects compiled by aptos and sui, if you want to detect move projects, please use `./build move20` to compile.
 
 **Step 2.** Configure Shell (Option)
 

@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-cargo build --release
 SHELL_FOLDER=$(
     cd "$(dirname "$0")"
     pwd
@@ -10,6 +9,8 @@ MOVESCANNER_PATH_SOURCE=$RELEASE_PATH"/MoveScanner"
 MOVESCANNER_ROOT=$HOME"/.MoveScanner"
 MOVESCANNER_BIN=$MOVESCANNER_ROOT"/bin"
 MOVESCANNER_PATH_TARGET=$MOVESCANNER_BIN"/MoveScanner"
+DEPENDENCIES=("move-binary-format" "move-core-types" "move-model" "move-package" "move-stackless-bytecode")
+
 function LOG_INFO() {
     echo -e "\033[33mINFO: ${1}\033[0m"
 }
@@ -19,6 +20,29 @@ function LOG_SUCCESS() {
 function LOG_ERROR() {
     echo -e "\033[4m\033[1m\033[31mERROR:\033[0m\033[31m${1}\033[0m"
 }
+function CHANGE_MOVE() {
+    local param="$1"
+    for dep in "${DEPENDENCIES[@]}"; do
+        echo "$param"
+        if [ "$param" == "move20" ]; then
+            cargo remove $dep
+            cargo add $dep --git https://github.com/uestc-sec/move --branch default
+        elif [ "$param" == "move32" ]; then
+            cargo remove $dep
+            cargo add $dep --git https://github.com/uestc-sec/move --branch main
+        else
+            LOG_ERROR "Please use correct build option"
+            exit 1
+        fi
+    done
+}
+
+if [ $# -eq 1 ]; then
+    CHANGE_MOVE "$1"
+fi
+
+cargo build --release
+
 if [ ! -x $MOVESCANNER_PATH_SOURCE ]; then
     LOG_ERROR "Please check if 'cargo build --release' success."
 else
