@@ -421,7 +421,7 @@ fn is_uint(ty: &Type) -> bool {
 fn get_uint_max(ty: &Type) -> Option<U256> {
     if let Type::Primitive(bty) = ty {
         match bty {
-            PrimitiveType::U8 => Some(U256::from_str("255").unwrap()),
+            PrimitiveType::U8 => Some(U256::from_str("127").unwrap()),
             PrimitiveType::U16 => Some(U256::from_str("65535").unwrap()),
             PrimitiveType::U32 => Some(U256::from_str("4294967295").unwrap()),
             PrimitiveType::U64 => Some(U256::from_str("18446744073709551615").unwrap()),
