@@ -1,7 +1,7 @@
 use ethnum::U256;
 use std::{
     cell::RefCell,
-    collections::BTreeMap,
+    collections::{BTreeMap, VecDeque},
     ops::{Rem, Sub},
     rc::Rc,
     str::FromStr,
@@ -93,22 +93,28 @@ impl Node {
         }
     }
 
-    pub fn loop_condition_from_copy(&self, condtions: &mut Vec<usize>) {
+    pub fn loop_condition_from_copy(&self, conditions: &mut Vec<usize>, params: &mut VecDeque<usize>) {
         match &self.value {
             Val::ByteCode(bc) => match bc {
                 Call(_, _, BorrowLoc, srcs, _) => {
-                    condtions.push(srcs[0]);
-                }
+                    conditions.push(srcs[0]);
+                },
+                Call(_, _, Function(_, _, _), srcs, _) => {
+                    params.extend(srcs);
+                },
                 _ => {
                     for subnode in self.subnodes.iter() {
-                        subnode.borrow().loop_condition_from_copy(condtions);
+                        subnode.borrow().loop_condition_from_copy(conditions, params);
                     }
                 }
             },
             Val::AssIgn(Bytecode::Assign(_, _, idx, assignkind)) => match assignkind {
                 AssignKind::Copy => {
-                    condtions.push(*idx);
-                }
+                    conditions.push(*idx);
+                },
+                AssignKind::Move => {
+                    conditions.push(*idx);
+                },
                 _ => {}
             },
             _ => {}
@@ -149,7 +155,9 @@ impl Node {
                         subnode.borrow().display(res, stbgr);
                         res.push_str(", ");
                     }
-                    res.truncate(res.len() - 2);
+                    if !self.subnodes.is_empty() {
+                        res.truncate(res.len() - 2);
+                    }
                     res.push_str(")");
                 }
             }

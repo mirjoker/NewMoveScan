@@ -15,7 +15,7 @@ use move_stackless_bytecode::{
     stackless_bytecode::{AssignKind, Bytecode, Operation},
     stackless_control_flow_graph::BlockContent,
 };
-use std::{collections::BTreeSet, vec};
+use std::{collections::{BTreeSet, VecDeque}, vec};
 pub struct Detector4<'a> {
     packages: &'a Packages<'a>,
     content: DetectContent,
@@ -52,7 +52,7 @@ impl<'a> Detector4<'a> {
         idx: usize,
     ) -> Option<String> {
         let function = &stbgr.functions[idx];
-        let (_natural_loops, fat_loops) = fatloop::get_loops(function);
+                let (_natural_loops, fat_loops) = fatloop::get_loops(function);
         // let data_depent = data_dependency(packages, stbgr, idx, 1);
         let data_depent = &stbgr.data_dependency[idx];
         let cfg = function.cfg.as_ref().unwrap();
@@ -69,7 +69,7 @@ impl<'a> Detector4<'a> {
                 let bodys = natural_loop.loop_body.clone();
                 unions.append(&mut bodys.clone());
             }
-            // 可能跳出循环的条件
+            // 可以结束循环的条件
             for union in unions.iter() {
                 let children = cfg.successors(*union);
                 for child in children {
@@ -80,6 +80,7 @@ impl<'a> Detector4<'a> {
             }
 
             let mut conditions = vec![];
+            let mut params = VecDeque::new();
             for natural_loop in fat_loop.sub_loops.iter() {
                 for bid in natural_loop.loop_body.iter() {
                     let content = cfg.content(*bid);
@@ -93,9 +94,16 @@ impl<'a> Detector4<'a> {
                         let instr = &function.code[u as usize];
                         if let Bytecode::Branch(_, _, _, src) = instr {
                             let cond = data_depent.get(*src);
-                            cond.loop_condition_from_copy(&mut conditions);
+                            cond.loop_condition_from_copy(&mut conditions, &mut params);
                         }
                     }
+                }
+            }
+
+            while !params.is_empty() {
+                if let Some(param) = params.pop_front() {
+                    let cond = data_depent.get(param);
+                    cond.loop_condition_from_copy(&mut conditions, &mut params);
                 }
             }
 
