@@ -8,6 +8,8 @@ use crate::{
         detects::{
             detect1::Detector1, detect2::Detector2, detect3::Detector3, detect4::Detector4,
             detect5::Detector5, detect6::Detector6, detect7::Detector7, detect8::Detector8,
+            detect9::Detector9,detect10::Detector10,detect11::Detector11,detect12::Detector12,
+            detect13::Detector13,detect14::Detector14,
         },
         result::*,
     },
@@ -50,6 +52,12 @@ impl Detectors {
             Box::new(Detector6::new(&packages)),
             Box::new(Detector7::new(&packages)),
             Box::new(Detector8::new(&packages)),
+            Box::new(Detector9::new(&packages)),
+            Box::new(Detector10::new(&packages)),
+            Box::new(Detector11::new(&packages)),
+            Box::new(Detector12::new(&packages)),
+            Box::new(Detector13::new(&packages)),
+            Box::new(Detector14::new(&packages)),
         ];
 
         for detector in detectors.iter_mut() {

@@ -27,6 +27,12 @@ pub enum DetectKind {
     UnnecessaryBoolJudgment,
     UnusedConstant,
     UnusedPrivateFunctions,
+    MissingZeroCheck,
+    OrdersIssue,
+    EmitWithoutFriend,
+    MissingAccessControlAssertion,
+    ParameterValidationIssue,
+    WitnessCopy,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
