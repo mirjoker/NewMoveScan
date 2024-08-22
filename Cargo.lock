@@ -43,6 +43,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "time 0.2.27",
+ "walkdir",
 ]
 
 [[package]]
