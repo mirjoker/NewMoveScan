@@ -18,7 +18,7 @@ impl<'a> AbstractDetector<'a> for Detector9<'a> {
     fn new(packages: &'a Packages<'a>) -> Self {
         Self {
             packages,
-            content: DetectContent::new(Severity::Critical, DetectKind::MissingZeroCheck),
+            content: DetectContent::new(Severity::Minor, DetectKind::MissingZeroCheck),
         }
     }
 

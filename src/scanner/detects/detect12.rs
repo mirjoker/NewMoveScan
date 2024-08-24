@@ -52,13 +52,10 @@ impl<'a> Detector12<'a> {
     ) -> Option<String> {
         let mut signer_params = HashSet::new();
         let mut found_assertion = false;
-
-        // 根据函数的 args_count 假设参数数量
-        let args_count = function.args_count;
-
-        // 假设第一个参数是 &signer 类型
-        for i in 0..args_count {
-            if is_signer_param(i, function, symbol_pool) {
+        println!("Function local_types: {:?}", function.local_types);
+        // 遍历函数参数的实际类型
+        for (i, param_type) in function.local_types.iter().enumerate() {
+            if matches_signer_type(param_type) {
                 signer_params.insert(i);
             }
         }
@@ -66,28 +63,23 @@ impl<'a> Detector12<'a> {
         if signer_params.is_empty() {
             return None; // 没有 &signer 参数，无需检查
         }
-
+        
         // 检查是否存在针对 &signer 参数的断言
         for bytecode in &function.code {
             match bytecode {
-                Bytecode::Call(_, _, Operation::Function(_, _fid, _), _, _) => {
-                    // 示例：检查是否调用了特定的断言函数（这里你可能需要根据实际逻辑调整）
-                    if let Some(operation) = function.code.iter().find_map(|b| {
-                        if let Bytecode::Call(_, _, op, _, _) = b {
-                            Some(op)
-                        } else {
-                            None
-                        }
-                    }) {
-                        match operation {
-                            Operation::OpaqueCallBegin(_, _, _) => {
-                                // 示例：假设有 OpaqueCallBegin 表示可能存在断言
-                                found_assertion = true; // 根据实际逻辑进行判断
-                                break;
-                            }
-                            _ => continue,
-                        }
+                Bytecode::Call(_, _, Operation::Function(_, fun_id, _), args, _) => {
+                    let fun_name = symbol_pool.string(fun_id.symbol()).to_string();
+                    // 判断函数名是否包含 "assert"，并检查参数中是否使用了 &signer 参数
+                    if fun_name.contains("assert")
+                        && args.iter().any(|&arg| signer_params.contains(&arg))
+                    {
+                        found_assertion = true;
+                        break;
                     }
+                }
+                Bytecode::Call(_, _, Operation::OpaqueCallBegin(_, _, _), _, _) => {
+                    // 如果遇到 OpaqueCallBegin 可能需要额外处理
+                    continue;
                 }
                 _ => continue,
             }
@@ -102,25 +94,19 @@ impl<'a> Detector12<'a> {
     }
 }
 
-fn is_signer_param(index: usize, function: &FunctionInfo, _symbol_pool: &SymbolPool) -> bool {
-    if index >= function.args_count {
-        return false; // 索引超出参数范围
-    }
-
-    // 获取函数参数的类型
-    if let Some(param_type) = function.local_types.get(index) {
-        return matches_signer_type(param_type);
-    }
-
-    false
-}
-
 fn matches_signer_type(param_type: &Type) -> bool {
-    // 检查类型是否为 &signer，即 Reference(true, Box::new(Primitive(PrimitiveType::Signer)))
-    if let Type::Reference(true, ref inner_type) = param_type {
-        if let Type::Primitive(PrimitiveType::Signer) = *inner_type.as_ref() {
-            return true;
+    match param_type {
+        Type::Reference(true, inner_type) => {
+            if let Type::Primitive(PrimitiveType::Signer) = *inner_type.as_ref() {
+                return true;
+            }
         }
+        Type::Reference(false, inner_type) => {
+            if let Type::Primitive(PrimitiveType::Signer) = *inner_type.as_ref() {
+                return true;
+            }
+        }
+        _ => {}
     }
     false
 }

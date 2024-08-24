@@ -28,7 +28,7 @@ pub enum DetectKind {
     UnusedConstant,
     UnusedPrivateFunctions,
     MissingZeroCheck,
-    OrdersIssue,
+    GlobalStorageWithVector,
     EmitWithoutFriend,
     MissingAccessControlAssertion,
     ParameterValidationIssue,

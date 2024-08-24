@@ -28,7 +28,7 @@ use std::{
     vec,
 };
 use super::{utils::*, data_dependency::DataDepent};
-
+use move_binary_format::file_format::Visibility;
 pub fn addr_to_big_uint(addr: &AccountAddress) -> BigUint {
     BigUint::from_str_radix(&addr.to_string(), 16).unwrap()
 }
@@ -44,10 +44,11 @@ pub struct FunctionInfo {
     pub cfg: Option<StacklessControlFlowGraph>,
     pub def_attrid: Vec<Vec<usize>>,
     pub use_attrid: Vec<Vec<usize>>,
+    pub visibility: Visibility,
 }
 
 impl FunctionInfo {
-    pub fn new(idx: usize, name: String) -> Self {
+    pub fn new(idx: usize, name: String,visibility: Visibility) -> Self {
         FunctionInfo {
             idx,
             name,
@@ -60,6 +61,7 @@ impl FunctionInfo {
             cfg: None,
             def_attrid: vec![],
             use_attrid: vec![],
+            visibility,
         }
     }
 }
@@ -197,7 +199,9 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             let handle = self.module.function_handle_at(func_def.function);
             let fname = self.module.identifier_at(handle.name).to_string();
 
-            let mut function = FunctionInfo::new(idx, fname);
+            let visibility = view.visibility(); // 获取可见性
+            let mut function = FunctionInfo::new(idx, fname, visibility);
+
             let local_count = match view.locals_signature() {
                 Some(locals_view) => locals_view.len(),
                 None => view.parameters().len(),
