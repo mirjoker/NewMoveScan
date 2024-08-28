@@ -7,7 +7,7 @@ use crate::{
     scanner::{detectors::AbstractDetector, result::*},
 };
 use move_model::symbol::SymbolPool;
-use move_stackless_bytecode::stackless_bytecode::{Bytecode, Operation};
+use move_stackless_bytecode::stackless_bytecode::Bytecode;
 
 pub struct Detector13<'a> {
     packages: &'a Packages<'a>,
@@ -44,36 +44,33 @@ impl<'a> Detector13<'a> {
     pub fn detect_inefficient_assert(
         &self,
         function: &FunctionInfo,
-        symbol_pool: &SymbolPool,
+        _symbol_pool: &SymbolPool,
         idx: usize,
         stbgr: &StacklessBytecodeGenerator,
     ) -> Option<String> {
         let args_count = function.args_count as usize;
-        let mut first_assert_position = None;
+        let mut found_assertion = false;
 
         for (code_offset, bytecode) in function.code.iter().enumerate() {
             match bytecode {
-                Bytecode::Call(_, args, Operation::Function(_, fun_id, _), _, _) => {
-                    let fun_name = symbol_pool.string(fun_id.symbol()).to_string();
-                    if fun_name.contains("assert") {
-                        // Check if `assert` is validating function parameters
-                        if self.check_arguments(args, args_count) {
-                            // Record the position of the first `assert` that validates parameters
-                            if first_assert_position.is_none() {
-                                first_assert_position = Some(code_offset);
-                            }
+                // 检查 Branch 和 Abort 指令，是否与参数验证相关
+                Bytecode::Branch(_, _, _, cond) | Bytecode::Abort(_, cond) => {
+                    if self.check_arguments(&[*cond], args_count) {
+                        // 如果在之前已经发现了其他操作，说明assert不在第一行
+                        if code_offset > 0 {
+                            let curr_func_name = utils::get_function_name(idx, stbgr);
+                            return Some(curr_func_name);
                         }
+                        found_assertion = true;
                     }
                 }
-                _ => {}
-            }
-        }
-
-        // If we found an `assert` that validates parameters, but it's not at the start of the function
-        if let Some(first_assert_pos) = first_assert_position {
-            if first_assert_pos > 0 {
-                let curr_func_name = utils::get_function_name(idx, stbgr);
-                return Some(curr_func_name);
+                _ => {
+                    // 如果还没发现 `assert`，但已经出现了其他操作，意味着assert不在第一行
+                    if !found_assertion {
+                        let curr_func_name = utils::get_function_name(idx, stbgr);
+                        return Some(curr_func_name);
+                    }
+                }
             }
         }
 
@@ -84,5 +81,3 @@ impl<'a> Detector13<'a> {
         args.iter().any(|&arg| arg < args_count)
     }
 }
-
-

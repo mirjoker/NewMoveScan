@@ -6,21 +6,23 @@ use crate::{
     },
     scanner::{detectors::AbstractDetector, result::*},
 };
+use move_binary_format::file_format::StructHandleIndex;
 use move_model::symbol::SymbolPool;
 use move_stackless_bytecode::stackless_bytecode::{Bytecode, Operation};
-use std::collections::HashSet;
-use move_model::ty::{PrimitiveType, Type};
+use move_model::model::{StructId, ModuleId};
 
 pub struct Detector12<'a> {
     packages: &'a Packages<'a>,
     content: DetectContent,
+    target_module_id: ModuleId, // 添加字段来指定目标模块ID
 }
 
 impl<'a> AbstractDetector<'a> for Detector12<'a> {
     fn new(packages: &'a Packages<'a>) -> Self {
         Self {
             packages,
-            content: DetectContent::new(Severity::Minor, DetectKind::MissingAccessControlAssertion),
+            content: DetectContent::new(Severity::Minor, DetectKind::UnnecessaryWitnessCope),
+            target_module_id: ModuleId::new(0), // 默认值，可以根据需要调整
         }
     }
 
@@ -31,9 +33,7 @@ impl<'a> AbstractDetector<'a> for Detector12<'a> {
                 if utils::is_native(idx, stbgr) {
                     continue;
                 }
-                if let Some(res) =
-                    self.detect_missing_access_control_assertion(function, &stbgr.symbol_pool, idx, stbgr)
-                {
+                if let Some(res) = self.detect_witness_copy(function, &stbgr.symbol_pool, idx, stbgr) {
                     self.content.result.get_mut(mname).unwrap().push(res);
                 }
             }
@@ -41,72 +41,64 @@ impl<'a> AbstractDetector<'a> for Detector12<'a> {
         &self.content
     }
 }
-
 impl<'a> Detector12<'a> {
-    pub fn detect_missing_access_control_assertion(
+    pub fn detect_witness_copy(
         &self,
         function: &FunctionInfo,
         symbol_pool: &SymbolPool,
         idx: usize,
         stbgr: &StacklessBytecodeGenerator,
     ) -> Option<String> {
-        let mut signer_params = HashSet::new();
-        let mut found_assertion = false;
-        println!("Function local_types: {:?}", function.local_types);
-        // 遍历函数参数的实际类型
-        for (i, param_type) in function.local_types.iter().enumerate() {
-            if matches_signer_type(param_type) {
-                signer_params.insert(i);
-            }
-        }
-
-        if signer_params.is_empty() {
-            return None; // 没有 &signer 参数，无需检查
-        }
-        
-        // 检查是否存在针对 &signer 参数的断言
-        for bytecode in &function.code {
-            match bytecode {
-                Bytecode::Call(_, _, Operation::Function(_, fun_id, _), args, _) => {
-                    let fun_name = symbol_pool.string(fun_id.symbol()).to_string();
-                    // 判断函数名是否包含 "assert"，并检查参数中是否使用了 &signer 参数
-                    if fun_name.contains("assert")
-                        && args.iter().any(|&arg| signer_params.contains(&arg))
-                    {
-                        found_assertion = true;
-                        break;
+        for bytecode in function.code.iter() {
+            if let Bytecode::Call(_, _, Operation::Pack(module_id, struct_id, _), _, _) = bytecode {
+                if *module_id == self.target_module_id {
+                    if let Some(struct_handle_index) = self.get_struct_handle_index(struct_id, stbgr) {
+                        if self.is_witness_struct_with_copy_ability(struct_handle_index, stbgr, symbol_pool) {
+                            let curr_func_name = utils::get_function_name(idx, stbgr);
+                            return Some(format!(
+                                "{}",
+                                curr_func_name
+                            ));
+                        }
                     }
                 }
-                Bytecode::Call(_, _, Operation::OpaqueCallBegin(_, _, _), _, _) => {
-                    // 如果遇到 OpaqueCallBegin 可能需要额外处理
-                    continue;
+            }
+        }
+        None
+    }
+    fn is_witness_struct_with_copy_ability(
+        &self,
+        struct_handle_index: StructHandleIndex,
+        stbgr: &StacklessBytecodeGenerator,
+        symbol_pool: &SymbolPool,
+    ) -> bool {
+        let struct_id = stbgr.get_struct_id_by_idx(&struct_handle_index);
+        if let Some(qsymbol) = stbgr.reverse_struct_table.get(&(self.target_module_id, struct_id)) {
+            let struct_name = symbol_pool.string(qsymbol.symbol).to_string();
+            if struct_name == "Witness" {
+                let abilities = &stbgr.module.struct_handles[struct_handle_index.0 as usize].abilities;
+                return abilities.has_copy(); // 只检查 copy 能力
+            }
+        }
+        false
+    }
+    fn get_struct_handle_index(
+        &self,
+        struct_id: &StructId,
+        stbgr: &StacklessBytecodeGenerator,
+    ) -> Option<StructHandleIndex> {
+        stbgr
+            .module
+            .struct_handles
+            .iter()
+            .enumerate()
+            .find_map(|(idx, _handle)| {
+                if stbgr.get_struct_id_by_idx(&StructHandleIndex::new(idx as u16)) == *struct_id {
+                    Some(StructHandleIndex::new(idx as u16))
+                } else {
+                    None
                 }
-                _ => continue,
-            }
-        }
-
-        let curr_func_name = utils::get_function_name(idx, stbgr);
-        if !found_assertion {
-            Some(format!("{}: 缺少对 &signer 参数的访问控制断言", curr_func_name))
-        } else {
-            None
-        }
+            })
     }
 }
 
-fn matches_signer_type(param_type: &Type) -> bool {
-    match param_type {
-        Type::Reference(true, inner_type) => {
-            if let Type::Primitive(PrimitiveType::Signer) = *inner_type.as_ref() {
-                return true;
-            }
-        }
-        Type::Reference(false, inner_type) => {
-            if let Type::Primitive(PrimitiveType::Signer) = *inner_type.as_ref() {
-                return true;
-            }
-        }
-        _ => {}
-    }
-    false
-}

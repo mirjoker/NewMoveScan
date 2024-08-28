@@ -6,10 +6,9 @@ use crate::{
     },
     scanner::{detectors::AbstractDetector, result::*},
 };
-use move_binary_format::file_format::StructHandleIndex;
-use move_model::symbol::SymbolPool;
+use move_model::symbol:: SymbolPool;
 use move_stackless_bytecode::stackless_bytecode::{Bytecode, Operation};
-use move_model::model::StructId;
+use move_model::ty::Type;
 
 pub struct Detector14<'a> {
     packages: &'a Packages<'a>,
@@ -20,7 +19,7 @@ impl<'a> AbstractDetector<'a> for Detector14<'a> {
     fn new(packages: &'a Packages<'a>) -> Self {
         Self {
             packages,
-            content: DetectContent::new(Severity::Minor, DetectKind::WitnessCopy),
+            content: DetectContent::new(Severity::Minor, DetectKind::GlobalStorageWithVector),
         }
     }
 
@@ -31,7 +30,7 @@ impl<'a> AbstractDetector<'a> for Detector14<'a> {
                 if utils::is_native(idx, stbgr) {
                     continue;
                 }
-                if let Some(res) = self.detect_witness_copy(function, &stbgr.symbol_pool, idx, stbgr) {
+                if let Some(res) = self.detect_global_storage_with_vector(function, &stbgr.symbol_pool, idx, stbgr) {
                     self.content.result.get_mut(mname).unwrap().push(res);
                 }
             }
@@ -41,68 +40,54 @@ impl<'a> AbstractDetector<'a> for Detector14<'a> {
 }
 
 impl<'a> Detector14<'a> {
-    pub fn detect_witness_copy(
+    pub fn detect_global_storage_with_vector(
         &self,
         function: &FunctionInfo,
-        symbol_pool: &SymbolPool,
+        _symbol_pool: &SymbolPool,
         idx: usize,
         stbgr: &StacklessBytecodeGenerator,
     ) -> Option<String> {
+        let mut detected_vector_usage: Vec<String> = Vec::new();
         for bytecode in function.code.iter() {
-            if let Bytecode::Call(_, _, Operation::Pack(_, struct_id, _), _, _) = bytecode {
-                if let Some(struct_handle_index) = self.get_struct_handle_index(struct_id, stbgr) {
-                    if self.is_witness_struct_with_copy_ability(&struct_handle_index, stbgr, symbol_pool) {
-                        let curr_func_name = utils::get_function_name(idx, stbgr);
-                        return Some(format!(
-                            "{}: Witness struct with copy ability used in the function",
-                            curr_func_name
-                        ));
+            match &bytecode {
+                Bytecode::Call(_, _, oper, _, _) => {
+                    if self.is_global_storage_operation(oper) && self.contains_vector_type(oper) {
+                        detected_vector_usage.push(utils::get_function_name(idx, stbgr));
                     }
                 }
+                _ => continue,
             }
         }
-        None
-    }
-
-    fn is_witness_struct_with_copy_ability(
-        &self,
-        struct_handle_index: &StructHandleIndex,
-        stbgr: &StacklessBytecodeGenerator,
-        symbol_pool: &SymbolPool,
-    ) -> bool {
-        let struct_id = stbgr.get_struct_id_by_idx(struct_handle_index);
-        let module_id = self.get_module_id(stbgr);
-        if let Some(qsymbol) = stbgr.reverse_struct_table.get(&(module_id, struct_id)) {
-            let struct_name = symbol_pool.string(qsymbol.symbol).to_string();
-            if struct_name == "Witness" {
-                // 检查该结构体是否具有 copy 能力
-                let abilities = &stbgr.module.struct_handles[struct_handle_index.0 as usize].abilities;
-                return abilities.has_copy();
-            }
+        
+        if !detected_vector_usage.is_empty() {
+            detected_vector_usage.sort();
+            detected_vector_usage.dedup();
+            let curr_func_name = utils::get_function_name(idx, stbgr);
+            let res = format!(
+                "{}({})",
+                curr_func_name,
+                detected_vector_usage.join(","),
+            );
+            Some(res)
+        } else {
+            None
         }
-        false
     }
-    
 
-    fn get_struct_handle_index(
-        &self,
-        struct_id: &StructId,
-        stbgr: &StacklessBytecodeGenerator,
-    ) -> Option<StructHandleIndex> {
-        stbgr
-            .module
-            .struct_handles
-            .iter()
-            .enumerate()
-            .find(|(idx, _)| {
-                stbgr.get_struct_id_by_idx(&StructHandleIndex::new(*idx as u16)) == *struct_id
-            })
-            .map(|(idx, _)| StructHandleIndex::new(idx as u16))
+    fn is_global_storage_operation(&self, oper: &Operation) -> bool {
+        matches!(
+            oper,
+            Operation::MoveTo(..) | Operation::MoveFrom(..) | Operation::Exists(..)
+        )
     }
-    
 
-    fn get_module_id(&self, _stbgr: &StacklessBytecodeGenerator) -> move_model::model::ModuleId {
-        let index = 0; 
-        move_model::model::ModuleId::new(index)
+    fn contains_vector_type(&self, oper: &Operation) -> bool {
+        let types = match oper {
+            Operation::MoveTo(_, _, types)
+            | Operation::MoveFrom(_, _, types)
+            | Operation::Exists(_, _, types) => types,
+            _ => return false,
+        };
+        types.iter().any(|ty| matches!(ty, Type::Vector(..)))
     }
 }
