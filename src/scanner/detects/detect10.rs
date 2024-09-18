@@ -35,8 +35,7 @@ impl<'a> AbstractDetector<'a> for Detector10<'a> {
 
                 let visibility = &function.visibility;
 
-                if let Some(res) = self.detect_event_emit_without_friend(function, visibility, &stbgr.symbol_pool, idx, stbgr)
-                {
+                if let Some(res) = self.detect_event_emit_without_friend(function, visibility, &stbgr.symbol_pool, idx, stbgr) {
                     self.content.result.get_mut(mname).unwrap().push(res);
                 }
             }
@@ -49,7 +48,7 @@ impl<'a> Detector10<'a> {
     pub fn detect_event_emit_without_friend(
         &self,
         function_info: &FunctionInfo,
-        visibility: &Visibility,  // 直接使用 Visibility 枚举
+        visibility: &Visibility,
         symbol_pool: &SymbolPool,
         idx: usize,
         stbgr: &StacklessBytecodeGenerator,
@@ -58,21 +57,65 @@ impl<'a> Detector10<'a> {
         let is_public = matches!(visibility, Visibility::Public);
 
         let mut contains_emit_event = false;
+        let mut contains_state_update = false;
 
         for bytecode in function_info.code.iter() {
-            if let Bytecode::Call(_, _, Operation::Function(_, fun_id, _), _, _) = bytecode {
-                let fun_name = symbol_pool.string(fun_id.symbol()).to_string();
-                if fun_name.contains("emit_event") {
-                    contains_emit_event = true;
-                    break;
-                }
+            match bytecode {
+                // 检查是否包含事件触发操作
+                Bytecode::Call(_, _, Operation::Function(_, fun_id, _), _, _) => {
+                    let fun_name = symbol_pool.string(fun_id.symbol()).to_string();
+                    if fun_name.contains("emit_event") {
+                        contains_emit_event = true;
+                    }
+                    // 检查是否涉及资金操作或状态更新
+                    if fun_name.contains("withdraw") || fun_name.contains("deposit") || fun_name.contains("transfer") ||
+                       fun_name.contains("mint") || fun_name.contains("burn") || fun_name.contains("merge") || fun_name.contains("extract") ||
+                       fun_name.contains("add") || fun_name.contains("borrow_mut") || fun_name.contains("push_back") {
+                        contains_state_update = true;
+                    }
+                },
+                Bytecode::Call(_, _, Operation::MoveTo(..), _, _) |
+                Bytecode::Call(_, _, Operation::MoveFrom(..), _, _) => {
+                    contains_state_update = true;
+                },
+                _ => {}
             }
         }
 
-        if is_public && contains_emit_event {
-            return Some(curr_func_name);
+        // 如果是公共函数，且包含事件触发，但不涉及状态更新
+        if is_public && contains_emit_event && !contains_state_update {
+            if self.is_called_by_other_functions(&curr_func_name, symbol_pool, stbgr) {
+                return Some(curr_func_name);
+            }
         }
 
         None
     }
+    fn is_called_by_other_functions(
+        &self,
+        target_func_name: &str,
+        symbol_pool: &SymbolPool,
+        stbgr: &StacklessBytecodeGenerator,
+    ) -> bool {
+        for (idx, function) in stbgr.functions.iter().enumerate() {
+            if utils::get_function_name(idx, stbgr) == target_func_name {
+                continue;
+            }
+    
+            for bytecode in function.code.iter() {
+                match bytecode {
+                    Bytecode::Call(_, _, Operation::Function(_, fun_id, _), _, _) => {
+                        let callee_name = symbol_pool.string(fun_id.symbol()).to_string();
+                        if callee_name == target_func_name {
+                            return true;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    
+        false
+    }
 }
+

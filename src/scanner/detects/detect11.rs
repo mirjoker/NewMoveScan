@@ -52,7 +52,7 @@ impl<'a> Detector11<'a> {
     ) -> Option<String> {
         let mut signer_params = HashSet::new();
         let mut found_assertion = false;
-
+        let data_depent = &stbgr.data_dependency[idx];
         // 遍历函数参数的实际类型
         for (i, param_type) in function.local_types.iter().enumerate() {
             if matches_signer_type(param_type) {
@@ -70,6 +70,10 @@ impl<'a> Detector11<'a> {
                 // 检查 Branch 指令（条件跳转）
                 Bytecode::Branch(_, _, _, cond) | Bytecode::Abort(_, cond) => {
                     if signer_params.contains(cond) {
+                        found_assertion = true;
+                        break;
+                    }
+                    if data_depent.data.contains_key(cond){
                         found_assertion = true;
                         break;
                     }
