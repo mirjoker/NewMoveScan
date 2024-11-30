@@ -7,7 +7,7 @@ use crate::{
     scanner::{detectors::AbstractDetector, result::*},
 };
 use move_model::symbol::SymbolPool;
-use move_stackless_bytecode::stackless_bytecode::Bytecode;
+use move_stackless_bytecode::stackless_bytecode::{Bytecode, Operation};
 use std::collections::HashSet;
 use move_model::ty::{PrimitiveType, Type};
 
@@ -46,14 +46,17 @@ impl<'a> Detector11<'a> {
     pub fn detect_missing_access_control_assertion(
         &self,
         function: &FunctionInfo,
-        _symbol_pool: &SymbolPool,
+        symbol_pool: &SymbolPool,
         idx: usize,
         stbgr: &StacklessBytecodeGenerator,
     ) -> Option<String> {
         let mut signer_params = HashSet::new();
         let mut found_assertion = false;
+        let mut found_access_control = false;
+        let mut fund_transfer_found = false;
         let data_depent = &stbgr.data_dependency[idx];
-        // 遍历函数参数的实际类型
+
+        // 1. 遍历函数参数的实际类型，找出 &signer 类型的参数
         for (i, param_type) in function.local_types.iter().enumerate() {
             if matches_signer_type(param_type) {
                 signer_params.insert(i);
@@ -64,26 +67,36 @@ impl<'a> Detector11<'a> {
             return None; // 没有 &signer 参数，无需检查
         }
 
-        // 检查是否存在针对 &signer 参数的断言
+        // 2. 遍历字节码，寻找资金转移操作和权限验证函数
         for bytecode in &function.code {
             match bytecode {
-                // 检查 Branch 指令（条件跳转）
-                Bytecode::Branch(_, _, _, cond) | Bytecode::Abort(_, cond) => {
-                    if signer_params.contains(cond) {
-                        found_assertion = true;
-                        break;
+                // 资金转移操作，如 MoveTo、MoveFrom
+                Bytecode::Call(_, _, Operation::MoveTo(_, _, _), _, _) | 
+                Bytecode::Call(_, _, Operation::MoveFrom(_, _, _), _, _) => {
+                    fund_transfer_found = true;
+                }
+
+                // 权限验证函数调用，使用 symbol_pool 获取函数名
+                Bytecode::Call(_, _, Operation::Function(_, fun_id, _), _, _) => {
+                    let fun_name = symbol_pool.string(fun_id.symbol()).to_string();
+                    if fun_name.contains("assert_admin") || fun_name.contains("assert_owner") || fun_name.contains("require_admin") {
+                        found_access_control = true;
                     }
-                    if data_depent.data.contains_key(cond){
+                }
+
+                // 条件跳转和中止指令，涉及 signer 参数
+                Bytecode::Branch(_, _, _, cond) | Bytecode::Abort(_, cond) => {
+                    if signer_params.contains(cond) || data_depent.data.contains_key(cond) {
                         found_assertion = true;
-                        break;
                     }
                 }
                 _ => continue,
             }
         }
 
+        // 3. 判断是否同时存在 &signer 参数、资金转移操作、并且没有适当的访问控制
         let curr_func_name = utils::get_function_name(idx, stbgr);
-        if !found_assertion {
+        if fund_transfer_found && !found_assertion && !found_access_control {
             Some(format!("{}", curr_func_name))
         } else {
             None

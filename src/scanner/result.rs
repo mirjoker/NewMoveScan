@@ -31,8 +31,6 @@ pub enum DetectKind {
     UnnecessaryEmit,
     UnnecessaryAccessControl,
     UnnecessaryWitnessCope,
-    GlobalStorageWithVector,
-    ParameterValidationIssue,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
