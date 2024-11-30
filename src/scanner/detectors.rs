@@ -6,8 +6,6 @@ use crate::{
     },
     scanner::{
         detects::{
-            detect1::Detector1, detect2::Detector2, detect3::Detector3, detect4::Detector4,
-            detect5::Detector5, detect6::Detector6, detect7::Detector7, detect8::Detector8,
             detect9::Detector9,detect10::Detector10,detect11::Detector11,detect12::Detector12,
         },
         result::*,
@@ -43,14 +41,6 @@ impl Detectors {
         let packages = Packages::new(&cms);
         self.init_result(&packages);
         let mut detectors: Vec<Box<dyn AbstractDetector>> = vec![
-            Box::new(Detector1::new(&packages)),
-            Box::new(Detector2::new(&packages)),
-            Box::new(Detector3::new(&packages)),
-            Box::new(Detector4::new(&packages)),
-            Box::new(Detector5::new(&packages)),
-            Box::new(Detector6::new(&packages)),
-            Box::new(Detector7::new(&packages)),
-            Box::new(Detector8::new(&packages)),
             Box::new(Detector9::new(&packages)),
             Box::new(Detector10::new(&packages)),
             Box::new(Detector11::new(&packages)),
