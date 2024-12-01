@@ -11,7 +11,7 @@ The project list and data features can be found in res/features/.
 
 1. Extract the compiled open-source projects:
 ```shell
-cd NewMoveScan/tests/ds1/res
+cd NewMoveScan/tests/ds1/res/repo
 unzip Sui.zip 
 unzip Aptos.zip
 ```
