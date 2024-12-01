@@ -1,0 +1,30 @@
+{
+    "modules_status": {
+        "wrong": 0,
+        "pass": 1
+    },
+    "total_time": 849,
+    "modules": {
+        "vesting": {
+            "function_count": {
+                "native": 0,
+                "all": 3
+            },
+            "constant_count": 6,
+            "detectors": {
+                "unnecessary_bool_judgment": [],
+                "unchecked_return": [],
+                "unnecessary_type_conversion": [],
+                "unused_private_functions": [],
+                "unchecked_zero": [],
+                "infinite_loop": [],
+                "unnecessary_emit": [],
+                "precision_loss": [],
+                "unused_constant": [],
+                "overflow": [],
+                "unnecessary_access_control": [],
+                "unnecessary_witness_cope": []
+            }
+        }
+    }
+}
