@@ -34,6 +34,9 @@ git pull
 
 **Step 4.** Start a new terminal session, enjoy!
 
+Datasets ds1 and ds2 are located in the test folder.
+
+
 ## Usage
 
 ```
