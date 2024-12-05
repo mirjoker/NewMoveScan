@@ -1,52 +1,10 @@
 {
     "modules_status": {
-        "pass": 5,
-        "wrong": 0
+        "wrong": 0,
+        "pass": 5
     },
-    "total_time": 53308,
+    "total_time": 8187,
     "modules": {
-        "lands": {
-            "function_count": {
-                "native": 0,
-                "all": 2
-            },
-            "constant_count": 12,
-            "detectors": {
-                "unnecessary_access_control": [],
-                "unused_constant": [],
-                "unnecessary_bool_judgment": [],
-                "unnecessary_witness_cope": [],
-                "infinite_loop": [],
-                "unchecked_return": [],
-                "unchecked_zero": [],
-                "unnecessary_emit": [],
-                "unnecessary_type_conversion": [],
-                "overflow": [],
-                "precision_loss": [],
-                "unused_private_functions": []
-            }
-        },
-        "wolf_witch": {
-            "function_count": {
-                "all": 41,
-                "native": 0
-            },
-            "constant_count": 75,
-            "detectors": {
-                "unused_constant": [],
-                "unnecessary_emit": [],
-                "precision_loss": [],
-                "unnecessary_type_conversion": [],
-                "infinite_loop": [],
-                "unchecked_zero": [],
-                "unnecessary_witness_cope": [],
-                "unnecessary_bool_judgment": [],
-                "unchecked_return": [],
-                "unused_private_functions": [],
-                "unnecessary_access_control": [],
-                "overflow": []
-            }
-        },
         "potion": {
             "function_count": {
                 "native": 0,
@@ -55,38 +13,59 @@
             "constant_count": 13,
             "detectors": {
                 "overflow": [],
+                "infinite_loop": [],
+                "precision_loss": [],
+                "unchecked_return": [],
+                "unnecessary_bool_judgment": [],
+                "unused_private_functions": [],
                 "unchecked_zero": [],
                 "unnecessary_witness_cope": [],
+                "unused_constant": [],
                 "unnecessary_emit": [],
+                "unnecessary_access_control": [],
+                "unnecessary_type_conversion": []
+            }
+        },
+        "wolf_witch": {
+            "function_count": {
+                "native": 0,
+                "all": 41
+            },
+            "constant_count": 75,
+            "detectors": {
+                "unnecessary_witness_cope": [],
                 "unchecked_return": [],
                 "precision_loss": [],
                 "unused_constant": [],
-                "unnecessary_bool_judgment": [],
-                "unused_private_functions": [],
-                "unnecessary_access_control": [],
-                "unnecessary_type_conversion": [],
-                "infinite_loop": []
-            }
-        },
-        "utils": {
-            "function_count": {
-                "all": 5,
-                "native": 0
-            },
-            "constant_count": 2,
-            "detectors": {
-                "unchecked_return": [],
-                "unnecessary_emit": [],
                 "overflow": [],
                 "unnecessary_type_conversion": [],
                 "unused_private_functions": [],
-                "unchecked_zero": [],
-                "unnecessary_witness_cope": [],
+                "unnecessary_emit": [],
                 "infinite_loop": [],
-                "unnecessary_access_control": [],
                 "unnecessary_bool_judgment": [],
+                "unnecessary_access_control": [],
+                "unchecked_zero": []
+            }
+        },
+        "lands": {
+            "function_count": {
+                "native": 0,
+                "all": 2
+            },
+            "constant_count": 12,
+            "detectors": {
+                "overflow": [],
                 "unused_constant": [],
-                "precision_loss": []
+                "infinite_loop": [],
+                "unchecked_return": [],
+                "unnecessary_emit": [],
+                "precision_loss": [],
+                "unused_private_functions": [],
+                "unnecessary_type_conversion": [],
+                "unnecessary_witness_cope": [],
+                "unchecked_zero": [],
+                "unnecessary_access_control": [],
+                "unnecessary_bool_judgment": []
             }
         },
         "dungeons": {
@@ -96,18 +75,39 @@
             },
             "constant_count": 6,
             "detectors": {
-                "unchecked_zero": [],
-                "unnecessary_type_conversion": [],
-                "unnecessary_bool_judgment": [],
+                "unnecessary_access_control": [],
                 "unused_constant": [],
                 "unchecked_return": [],
+                "unnecessary_type_conversion": [],
+                "unnecessary_witness_cope": [],
+                "unnecessary_emit": [],
+                "unchecked_zero": [],
+                "overflow": [],
                 "infinite_loop": [],
                 "precision_loss": [],
-                "unnecessary_emit": [],
-                "unnecessary_access_control": [],
+                "unnecessary_bool_judgment": [],
+                "unused_private_functions": []
+            }
+        },
+        "utils": {
+            "function_count": {
+                "native": 0,
+                "all": 5
+            },
+            "constant_count": 2,
+            "detectors": {
+                "unnecessary_bool_judgment": [],
+                "precision_loss": [],
+                "unnecessary_type_conversion": [],
                 "unnecessary_witness_cope": [],
+                "unused_constant": [],
+                "unchecked_return": [],
                 "unused_private_functions": [],
-                "overflow": []
+                "overflow": [],
+                "infinite_loop": [],
+                "unnecessary_emit": [],
+                "unchecked_zero": [],
+                "unnecessary_access_control": []
             }
         }
     }
