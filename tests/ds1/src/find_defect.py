@@ -1,6 +1,13 @@
 import os
 import json
 
+import os
+
+# 动态获取脚本所在目录
+script_dir = os.path.dirname(os.path.abspath(__file__))
+directory = os.path.join(script_dir, "../result/json")
+
+
 def find_defect(file_path, defect):
     count = 0
     with open(file_path, "r") as file:
@@ -14,7 +21,6 @@ def find_defect(file_path, defect):
 
 if __name__ == "__main__":
     defect = "unnecessary_access_control"
-    directory = "/home/jie/MoveScannerTest/OpenSource/result/json"
     total_count = 0
 
     for root, dirs, files in os.walk(directory):
