@@ -34,8 +34,9 @@ git pull
 
 **Step 4.** Start a new terminal session, enjoy!
 
-Datasets ds1 and ds2 are located in the test folder.
+Datasets `ds1` and `ds2` are located in the `test` folder.
 
+The detection results of the four detectors are in `test/result`.
 
 ## Usage
 
