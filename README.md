@@ -52,6 +52,37 @@ $ MoveScan -p <bytecode_file_path>
 
 To analyze the project in ds1:
 
-./NewMoveScan -p test/ds1/Aptos/umi-pool-seoul/build/umi-pool/bytecode_modules
+```shell
+$ ./NewMoveScan -p tests/ds1/Sui/poly-stc-contracts/build/Poly-STC-Bridge/bytecode_modules
+```
 
+```shell
+pass: 31     wrong: 3      time: 9868 us
 
+no: 0
+module_name: LockProxy
+unnecessary_access_control: [ init_event ] 
+unnecessary_emit: [ emit_fee_lock_event ] 
+
+no: 1
+module_name: StarcoinVerifier
+unnecessary_access_control: [ create ]
+
+no: 2
+module_name: TokenMock
+unnecessary_access_control: [ register_token ] 
+```
+
+To analyze the module in ds2:
+
+```shell
+$ ./NewMoveScan -p test/ds2/Aptos/1_0x1_account.mv
+```
+
+```shell
+pass: 0      wrong: 1      time: 2210 us
+
+no: 0
+module_name: account
+unnecessary_access_control: [ initialize ]
+```
