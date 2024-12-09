@@ -1,0 +1,18 @@
+[package]
+name = "Suia"
+version = "0.1.0"
+
+[dependencies]
+#Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework", rev = "devnet-0.20.0" }
+#sui-capybaras = { git = "https://github.com/MystenLabs/sui.git", subdir = "sui_programmability/examples/capy", rev = "devnet-0.20.0" }
+
+Sui = { local = "/home/yule/Movebit/sui/crates/sui-framework/packages/sui-framework" }
+#sui-capybaras = { local = "../../../sui/sui_programmability/examples/capy" }
+
+[addresses]
+# devnet-0.27.0
+#capy =  "0x0"
+# testnet
+#capy =  "0x4c10b61966a34d3bb5c8a8f063e6b7445fc41f93"
+suia = "0x0"
+sui =  "0x2"

@@ -1,0 +1,25 @@
+---
+compiled_package_info:
+  package_name: Pyth
+  address_alias_instantiation:
+    pyth: "0000000000000000000000000000000000000000000000000000000000000200"
+    std: "0000000000000000000000000000000000000000000000000000000000000001"
+    sui: "0000000000000000000000000000000000000000000000000000000000000002"
+    wormhole: "0000000000000000000000000000000000000000000000000000000000000100"
+  source_digest: BE10BBB7A742371BBE5846ADF24742C3188DA792494900624DD77663125B6DF0
+  build_flags:
+    dev_mode: false
+    test_mode: false
+    generate_docs: false
+    generate_abis: false
+    install_dir: ~
+    force_recompilation: false
+    lock_file: "./Move.lock"
+    additional_named_addresses: {}
+    architecture: ~
+    fetch_deps_only: false
+    skip_fetch_latest_git_deps: false
+dependencies:
+  - MoveStdlib
+  - Sui
+  - Wormhole

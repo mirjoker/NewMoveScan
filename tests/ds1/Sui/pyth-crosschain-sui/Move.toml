@@ -1,0 +1,13 @@
+[package]
+name = "Pyth"
+version = "0.0.1"
+
+[dependencies.Sui]
+local = "/home/yule/Movebit/sui/crates/sui-framework/packages/sui-framework"
+
+[dependencies.Wormhole]
+local = "/home/yule/Movebit/test_set/sui_test_set/wormhole"
+
+[addresses]
+pyth = "0x200"
+wormhole = "0x100"

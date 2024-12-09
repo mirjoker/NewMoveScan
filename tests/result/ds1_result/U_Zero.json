@@ -1,0 +1,14 @@
+{
+    "/home/zhang/NewMoveScan/tests/ds1/src/../result/json/Sui/Sui-AMM-swap/swap.json": 2,
+    "/home/zhang/NewMoveScan/tests/ds1/src/../result/json/Sui/Sui-AMM-swap/test_coins/test-coins.json": 1,
+    "/home/zhang/NewMoveScan/tests/ds1/src/../result/json/Sui/cetus-amm/sui/Cetus-AMM.json": 1,
+    "/home/zhang/NewMoveScan/tests/ds1/src/../result/json/Sui/defi/DeFi.json": 1,
+    "/home/zhang/NewMoveScan/tests/ds1/src/../result/json/Aptos/starswap-core-aptos/core/StarswapAptosCore.json": 1,
+    "/home/zhang/NewMoveScan/tests/ds1/src/../result/json/Aptos/baptswap-contracts/BaptSwap.json": 2,
+    "/home/zhang/NewMoveScan/tests/ds1/src/../result/json/Aptos/v1-core/Swap/AnimeSwapV1.json": 1,
+    "/home/zhang/NewMoveScan/tests/ds1/src/../result/json/Aptos/liquidswap/Liquidswap.json": 2,
+    "/home/zhang/NewMoveScan/tests/ds1/src/../result/json/Aptos/liquidswap/liquidswap_router_v2/LiquidswapRouterV2.json": 2,
+    "/home/zhang/NewMoveScan/tests/ds1/src/../result/json/Aptos/cetus-amm/aptos/Cetue-AMM.json": 1,
+    "/home/zhang/NewMoveScan/tests/ds1/src/../result/json/Aptos/pancake-contracts-move/pancake-swap/PancakeSwap.json": 2,
+    "total_count": 16
+}

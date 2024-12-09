@@ -1,0 +1,12 @@
+[package]
+name = "Wormhole"
+version = "0.2.0"
+
+[dependencies.Sui]
+local = "/home/yule/Movebit/sui/crates/sui-framework/packages/sui-framework"
+
+[addresses]
+wormhole = "0x100"
+
+[dev-addresses]
+wormhole = "0x100"
