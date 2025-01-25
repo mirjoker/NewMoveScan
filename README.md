@@ -45,8 +45,8 @@ Options:
 NewMoveScan supports the analysis of an entire project or an individual module within a project. For analyzing a project/module, you should provide the path to the compiled project/module.
 
 ```shell
-$ MoveScan -p <bytecode_dir_path>
-$ MoveScan -p <bytecode_file_path>
+$ NewMoveScan -p <bytecode_dir_path>
+$ NewMoveScan -p <bytecode_file_path>
 ```
 ## Examples
 
