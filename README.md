@@ -23,10 +23,10 @@ $ ./NewMoveScan -h  #ubuntu20.04
 ## Usage
 
 ```
-$ NewMoveScanner -h
+$ NewMoveScan -h
 A static analysis tool based on bytecode for move smart contracts.
 
-Usage: NewMoveScanner [OPTIONS] --path <PATH> [COMMAND]
+Usage: NewMoveScan [OPTIONS] --path <PATH> [COMMAND]
 
 Commands:
   printer
